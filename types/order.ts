@@ -48,6 +48,8 @@ export interface Order {
     pet_details?: string | null;
     customer: UserOut;
     driver?: DriverOut | null;
+    customer_lat?: number;
+    customer_lng?: number;
     created_at: string;
     pet: PetOut;
     pets: PetOut[]; // New array
@@ -68,4 +70,6 @@ export interface OrderCreate {
     price?: number | null;
     passengers?: number;
     pet_details?: string;
+    customer_lat?: number;
+    customer_lng?: number;
 }

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Alert, ActivityIndicator, Animated, PanResponder, Dimensions, ScrollView, Platform, Linking } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { AppButton } from '../../../components/ui/AppButton';
-import { Phone, MessageCircle, ArrowLeft, Navigation as NavIcon } from 'lucide-react-native';
+import { Phone, MessageCircle, ArrowLeft, Navigation as NavIcon, User } from 'lucide-react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useJobStore } from '../../../store/useJobStore';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -22,6 +22,19 @@ export default function ActiveJobScreen() {
     const [order, setOrder] = useState<Order | null>(null);
     const [routeCoordinates, setRouteCoordinates] = useState<LatLng[]>([]);
     const [currentLocation, setCurrentLocation] = useState<LatLng | null>(null);
+
+    // Pulse Animation for Customer Location
+    const pulseAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.timing(pulseAnim, {
+                toValue: 1,
+                duration: 2000,
+                useNativeDriver: true,
+            })
+        ).start();
+    }, []);
 
     // Animation for Bottom Sheet
     const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -72,8 +85,8 @@ export default function ActiveJobScreen() {
     useEffect(() => {
         let subscription: Location.LocationSubscription | null = null;
         const startWatching = async () => {
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') return;
+            const { status: permissionStatus } = await Location.requestForegroundPermissionsAsync();
+            if (permissionStatus !== 'granted') return;
 
             // Get initial immediately
             const loc = await Location.getCurrentPositionAsync({});
@@ -82,7 +95,25 @@ export default function ActiveJobScreen() {
             subscription = await Location.watchPositionAsync(
                 { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 20 },
                 (loc) => {
-                    setCurrentLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+                    const newPos = {
+                        latitude: loc.coords.latitude,
+                        longitude: loc.coords.longitude,
+                        heading: loc.coords.heading || 0
+                    };
+                    setCurrentLocation(newPos);
+
+                    if (status === 'in_progress' && mapRef.current) {
+                        mapRef.current.animateCamera({
+                            center: {
+                                latitude: newPos.latitude,
+                                longitude: newPos.longitude,
+                            },
+                            pitch: 45,
+                            heading: newPos.heading,
+                            altitude: 200,
+                            zoom: 18
+                        }, { duration: 1000 });
+                    }
                 }
             );
         };
@@ -193,10 +224,42 @@ export default function ActiveJobScreen() {
         };
     }, [id]);
 
+    const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+        const R = 6371e3; // metres
+        const φ1 = lat1 * Math.PI / 180;
+        const φ2 = lat2 * Math.PI / 180;
+        const Δφ = (lat2 - lat1) * Math.PI / 180;
+        const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c; // in metres
+    };
+
     const handleAction = async () => {
         if (!order) return;
         try {
             if (status === 'accepted') {
+                if (!currentLocation) {
+                    Alert.alert("Location Unknown", "Please wait for your GPS location to be updated.");
+                    return;
+                }
+
+                const dist = calculateDistance(
+                    currentLocation.latitude,
+                    currentLocation.longitude,
+                    order.pickup_lat,
+                    order.pickup_lng
+                );
+
+                if (dist > 200) {
+                    Alert.alert("Check-in Failed", `You are too far from the pickup location (${dist.toFixed(0)}m). You must be within 200m.`);
+                    return;
+                }
+
                 await orderService.updateOrderStatus(order.id, 'arrived');
                 setStatus('arrived');
             } else if (status === 'arrived') {
@@ -306,6 +369,38 @@ export default function ActiveJobScreen() {
                             <View className="w-2 h-2 bg-red-500 rounded-full" />
                         </View>
                     </Marker>
+                    {order.customer_lat && order.customer_lng && status !== 'in_progress' && status !== 'completed' && (
+                        <Marker
+                            coordinate={{ latitude: order.customer_lat, longitude: order.customer_lng }}
+                            title="Customer Location"
+                            anchor={{ x: 0.5, y: 0.5 }}
+                        >
+                            <View className="items-center justify-center">
+                                <Animated.View
+                                    style={{
+                                        position: 'absolute',
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: 20,
+                                        backgroundColor: 'rgba(59, 130, 246, 0.4)',
+                                        transform: [{
+                                            scale: pulseAnim.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: [1, 3]
+                                            })
+                                        }],
+                                        opacity: pulseAnim.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: [0.7, 0]
+                                        })
+                                    }}
+                                />
+                                <View className="bg-white p-1 rounded-full border-2 border-blue-500 shadow-lg">
+                                    <User size={20} color="#3B82F6" />
+                                </View>
+                            </View>
+                        </Marker>
+                    )}
                 </MapView>
 
                 <TouchableOpacity

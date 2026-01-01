@@ -9,7 +9,7 @@ export default function DriverTabs() {
                 headerShown: false,
                 tabBarActiveTintColor: COLORS.primary,
                 tabBarInactiveTintColor: 'gray',
-                tabBarStyle: { height: 60, paddingBottom: 10, paddingTop: 10 },
+                tabBarStyle: { height: 100, paddingBottom: 10, paddingTop: 10 },
             }}
         >
             <Tabs.Screen

@@ -186,4 +186,23 @@ export const orderService = {
 
         return await response.json();
     },
+
+    updateCustomerLocation: async (orderId: number, lat: number, lng: number): Promise<Order> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({
+                customer_lat: lat,
+                customer_lng: lng
+            }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to update customer location: ${response.status} - ${errorText}`);
+        }
+
+        return await response.json();
+    },
 };

@@ -16,6 +16,7 @@ import { Dimensions, Animated, PanResponder, Image } from 'react-native';
 import { orderService } from '../../../services/orderService';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { Order } from '../../../types/order';
+import * as Location from 'expo-location';
 
 const GOOGLE_MAPS_API_KEY = "AIzaSyDKQzAl_-qFOsxqp4Wq2aobo41GyGjtEw0";
 const HERE_MAPS_API_KEY = "z8S6QWJ90hW5peIMiwDk9sCdlKEPj7cYiZz0fdoAbxU";
@@ -42,7 +43,7 @@ export default function ConfirmBookingScreen() {
     const mapRef = useRef<MapView>(null);
     const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
     const [note, setNote] = useState('');
-    const { pickupLocation, dropoffLocation } = useBookingStore();
+    const { pickupLocation, dropoffLocation, clearBooking } = useBookingStore();
     const [distance, setDistance] = useState(0);
     // Force HERE Maps on confirm page
     const mapProvider: string = 'here';
@@ -67,6 +68,7 @@ export default function ConfirmBookingScreen() {
     const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
     const [isCancelling, setIsCancelling] = useState(false);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const shareLocationIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const prevStatusRef = useRef<Order['status'] | null>(null);
     const { user } = useAuthStore();
 
@@ -351,6 +353,27 @@ export default function ConfirmBookingScreen() {
             setCurrentOrder(order);
             console.log('Order created:', order.id);
 
+            const startSharingLocation = async (orderId: number) => {
+                if (shareLocationIntervalRef.current) clearInterval(shareLocationIntervalRef.current);
+                shareLocationIntervalRef.current = setInterval(async () => {
+                    try {
+                        const { status } = await Location.requestForegroundPermissionsAsync();
+                        if (status !== 'granted') return;
+                        const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+                        await orderService.updateCustomerLocation(orderId, location.coords.latitude, location.coords.longitude);
+                    } catch (error) {
+                        console.error('Error sharing customer location:', error);
+                    }
+                }, 5000);
+            };
+
+            const stopSharingLocation = () => {
+                if (shareLocationIntervalRef.current) {
+                    clearInterval(shareLocationIntervalRef.current);
+                    shareLocationIntervalRef.current = null;
+                }
+            };
+
             // Poll for order updates (acceptance, arrival, journey, completion)
             pollIntervalRef.current = setInterval(async () => {
                 try {
@@ -360,24 +383,31 @@ export default function ConfirmBookingScreen() {
                     // 1. Detect Status Change for Notifications
                     if (prevStatusRef.current && prevStatusRef.current !== updatedOrder.status) {
                         if (updatedOrder.status === 'arrived') {
-                            Alert.alert("Driver Arrived!", "Your driver has arrived at the pickup location. Please meet them at the pickup point.");
+                            Alert.alert("Driver Arrived!", "Your driver has arrived at the pickup location. Please meet them at the pickup point.", [
+                                { text: "OK", onPress: () => startSharingLocation(order.id) }
+                            ]);
                         } else if (updatedOrder.status === 'in_progress') {
+                            stopSharingLocation();
                             Alert.alert("Journey Started", "The journey has begun. Your pet is safely on the way!");
                         } else if (updatedOrder.status === 'completed') {
+                            stopSharingLocation();
                             Alert.alert("Journey Completed", "You have arrived at your destination. Thank you for using our service!", [
                                 {
                                     text: "OK",
                                     onPress: () => {
                                         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                                        stopSharingLocation();
                                         setBookingStatus('idle');
                                         setCurrentOrder(null);
                                         setAssignedDriver(null);
+                                        clearBooking();
                                         router.replace('/(customer)/(tabs)/home');
                                     }
                                 }
                             ]);
                         } else if (updatedOrder.status === 'cancelled') {
                             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                            stopSharingLocation();
                             Alert.alert("Booking Cancelled", "This booking has been cancelled by the driver.", [
                                 {
                                     text: "OK",
@@ -385,6 +415,7 @@ export default function ConfirmBookingScreen() {
                                         setBookingStatus('idle');
                                         setCurrentOrder(null);
                                         setAssignedDriver(null);
+                                        clearBooking();
                                     }
                                 }
                             ]);
@@ -393,37 +424,52 @@ export default function ConfirmBookingScreen() {
                     prevStatusRef.current = updatedOrder.status;
                     setCurrentOrder(updatedOrder);
 
-                    // 2. Handle First-time Acceptance
-                    if (bookingStatusRef.current === 'searching' && updatedOrder.status === 'accepted' && updatedOrder.driver_id) {
-                        // Find driver location for map display using Ref (latest data)
+                    // 2. Handle Driver Location & Navigation
+                    if (updatedOrder.driver_id) {
                         const currentDrivers = driverLocationsRef.current;
                         const driverLoc = currentDrivers.find(d => d.driver?.id === updatedOrder.driver_id);
 
                         if (driverLoc) {
                             setAssignedDriver(driverLoc);
 
-                            // Adjust map to show route between driver and pickup
-                            if (mapRef.current) {
-                                mapRef.current.fitToCoordinates([
-                                    { latitude: pickupLocation.latitude, longitude: pickupLocation.longitude },
-                                    { latitude: driverLoc.lat, longitude: driverLoc.lng }
-                                ], {
-                                    edgePadding: { top: 100, right: 50, bottom: 400, left: 50 },
-                                    animated: true
-                                });
+                            // 2.a Handle Navigation/Follow Mode (Always if in_progress)
+                            if (updatedOrder.status === 'in_progress' && mapRef.current) {
+                                mapRef.current.animateCamera({
+                                    center: {
+                                        latitude: driverLoc.lat,
+                                        longitude: driverLoc.lng,
+                                    },
+                                    pitch: 45,
+                                    heading: 0,
+                                    altitude: 500,
+                                    zoom: 17
+                                }, { duration: 2000 });
+                            }
+
+                            // 2.b Handle First-time Acceptance (Shift Map)
+                            if (bookingStatusRef.current === 'searching' && updatedOrder.status === 'accepted') {
+                                if (mapRef.current) {
+                                    mapRef.current.fitToCoordinates([
+                                        { latitude: pickupLocation.latitude, longitude: pickupLocation.longitude },
+                                        { latitude: driverLoc.lat, longitude: driverLoc.lng }
+                                    ], {
+                                        edgePadding: { top: 100, right: 50, bottom: 400, left: 50 },
+                                        animated: true
+                                    });
+                                }
+                                setBookingStatus('confirmed');
                             }
                         }
-                        setBookingStatus('confirmed');
                     }
                 } catch (err) {
                     console.error('Error polling order:', err);
                 }
             }, 3000); // Poll every 3 seconds
 
-            // Stop polling after 5 minutes
+            // Stop polling after 5 minutes ONLY if still searching
             setTimeout(() => {
-                if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-                if (bookingStatus === 'searching') {
+                if (bookingStatusRef.current === 'searching') {
+                    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                     setBookingStatus('idle');
                     Alert.alert('No driver found', 'Please try again later.');
                 }
@@ -451,12 +497,14 @@ export default function ConfirmBookingScreen() {
                         setIsCancelling(true);
                         try {
                             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                            if (shareLocationIntervalRef.current) clearInterval(shareLocationIntervalRef.current);
                             await orderService.cancelOrder(currentOrder.id);
 
                             // Reset state
                             setBookingStatus('idle');
                             setCurrentOrder(null);
                             setAssignedDriver(null);
+                            clearBooking();
 
                             // Adjust map back to pickup/dropoff
                             if (mapRef.current && pickupLocation && dropoffLocation) {
