@@ -17,9 +17,10 @@ import { orderService } from '../../../services/orderService';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { Order } from '../../../types/order';
 import * as Location from 'expo-location';
+import { formatPrice } from '../../../utils/format';
 
-const GOOGLE_MAPS_API_KEY = "AIzaSyDKQzAl_-qFOsxqp4Wq2aobo41GyGjtEw0";
-const HERE_MAPS_API_KEY = "z8S6QWJ90hW5peIMiwDk9sCdlKEPj7cYiZz0fdoAbxU";
+const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+const HERE_MAPS_API_KEY = process.env.EXPO_PUBLIC_HERE_MAPS_API_KEY || "";
 
 // Extend MOCK_RIDE_OPTIONS to match VEHICLE_TYPES expectation (surcharge)
 // Extend MOCK_RIDE_OPTIONS to match VEHICLE_TYPES expectation (surcharge)
@@ -54,6 +55,11 @@ export default function ConfirmBookingScreen() {
     const [loadingVehicles, setLoadingVehicles] = useState(true);
     const [hereRoutes, setHereRoutes] = useState<HereRoute[]>([]);
     const [driverLocations, setDriverLocations] = useState<DriverLocation[]>([]);
+    const [weightSurcharge, setWeightSurcharge] = useState(0);
+    const [surgeMultiplier, setSurgeMultiplier] = useState(1);
+    const [surgeReasons, setSurgeReasons] = useState<string[]>([]);
+    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'promptpay' | 'wallet' | 'stripe'>('cash');
+    const [walletBalance, setWalletBalance] = useState(0);
 
     // Booking State
     const [bookingStatus, setBookingStatus] = useState<'idle' | 'searching' | 'confirmed'>('idle');
@@ -150,6 +156,18 @@ export default function ConfirmBookingScreen() {
         fetchDrivers();
         // Poll every 5 seconds for better real-time updates
         const interval = setInterval(fetchDrivers, 5000);
+
+        // Fetch wallet balance
+        const fetchBalance = async () => {
+            try {
+                const res = await api.getWalletBalance();
+                setWalletBalance(res.wallet_balance || 0);
+            } catch (error) {
+                console.log("Error fetching wallet balance", error);
+            }
+        };
+        fetchBalance();
+
         return () => clearInterval(interval);
     }, []);
 
@@ -185,7 +203,9 @@ export default function ConfirmBookingScreen() {
                         image: mock?.image || 'car', // Fallback
                         description: mock?.description || '',
                         basePrice: v.rates.base,
-                        perKmRate: v.rates.per_km, // Store for fallback calculation
+                        perKmRate: v.rates.per_km,
+                        perMinRate: v.rates.per_min,
+                        minPrice: v.rates.min,
                         surcharge: 0
                     };
                 });
@@ -231,6 +251,9 @@ export default function ConfirmBookingScreen() {
                     provider: mapProvider
                 });
                 setPrice(response.estimated_price);
+                setWeightSurcharge(response.weight_surcharge || 0);
+                setSurgeMultiplier(response.surge_multiplier || 1);
+                setSurgeReasons(response.surge_reasons || []);
                 // Use backend distance/duration if available (fallback for Google Maps failure)
                 if (response.distance_km) setDistance(response.distance_km);
                 if (response.duration_min) setDuration(response.duration_min);
@@ -240,7 +263,16 @@ export default function ConfirmBookingScreen() {
                 console.warn("Could not fetch price from backend, using local calculation:", error);
                 // Fallback: Local Calculation
                 if (selectedVehicle && selectedVehicle.basePrice !== undefined && selectedVehicle.perKmRate !== undefined) {
-                    const fallbackPrice = selectedVehicle.basePrice + Math.round(distance * selectedVehicle.perKmRate);
+                    // Local weight surcharge calculation
+                    let localWeightSurcharge = 0;
+                    if (petWeight > 30) localWeightSurcharge = 60;
+                    else if (petWeight > 20) localWeightSurcharge = 40;
+                    else if (petWeight > 10) localWeightSurcharge = 20;
+
+                    setWeightSurcharge(localWeightSurcharge);
+
+                    const baseComponents = selectedVehicle.basePrice + (distance * selectedVehicle.perKmRate) + (duration * (selectedVehicle.perMinRate || 0));
+                    const fallbackPrice = Math.max(selectedVehicle.minPrice || 0, Math.round(baseComponents * surgeMultiplier + localWeightSurcharge));
                     setPrice(fallbackPrice);
                 }
             } finally {
@@ -325,6 +357,17 @@ export default function ConfirmBookingScreen() {
             Alert.alert('Error', 'Please login to book a ride');
             return;
         }
+        if (paymentMethod === 'wallet' && walletBalance < price) {
+            Alert.alert(
+                'ยอดเงินคงเหลือไม่พอ',
+                `คุณมียอดเงินในวอลเล็ทไม่เพียงพอ (คงเหลือ ฿${formatPrice(walletBalance)}) กรุณาเติมเงินก่อนดำเนินการจอง`,
+                [
+                    { text: 'ยกเลิก', style: 'cancel' },
+                    { text: 'เติมเงิน', onPress: () => router.push('/(customer)/(tabs)/wallet') }
+                ]
+            );
+            return;
+        }
 
         setBookingStatus('searching');
 
@@ -345,9 +388,19 @@ export default function ConfirmBookingScreen() {
                 dropoff_lng: dropoffLocation.longitude,
                 price: price,
                 status: 'pending',
+                payment_method: paymentMethod,
+                payment_status: paymentMethod === 'cash' ? 'pending' : 'pending', // Both pending initially
                 passengers: passengers,
                 pet_ids: petIds.map(Number), // Send all pet IDs
                 pet_details: displayPetNames
+            });
+
+            // Create initial payment record
+            await api.createPayment({
+                order_id: order.id,
+                amount: price,
+                method: paymentMethod,
+                status: 'pending'
             });
 
             setCurrentOrder(order);
@@ -401,7 +454,7 @@ export default function ConfirmBookingScreen() {
                                         setCurrentOrder(null);
                                         setAssignedDriver(null);
                                         clearBooking();
-                                        router.replace('/(customer)/(tabs)/home');
+                                        router.replace(`/(customer)/payment-summary/${order.id}`);
                                     }
                                 }
                             ]);
@@ -416,6 +469,7 @@ export default function ConfirmBookingScreen() {
                                         setCurrentOrder(null);
                                         setAssignedDriver(null);
                                         clearBooking();
+                                        router.replace('/(customer)/(tabs)/home');
                                     }
                                 }
                             ]);
@@ -471,7 +525,9 @@ export default function ConfirmBookingScreen() {
                 if (bookingStatusRef.current === 'searching') {
                     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                     setBookingStatus('idle');
-                    Alert.alert('No driver found', 'Please try again later.');
+                    Alert.alert('No driver found', 'Please try again later.', [
+                        { text: 'OK', onPress: () => router.replace('/(customer)/(tabs)/home') }
+                    ]);
                 }
             }, 300000);
 
@@ -505,6 +561,7 @@ export default function ConfirmBookingScreen() {
                             setCurrentOrder(null);
                             setAssignedDriver(null);
                             clearBooking();
+                            router.replace('/(customer)/(tabs)/home');
 
                             // Adjust map back to pickup/dropoff
                             if (mapRef.current && pickupLocation && dropoffLocation) {
@@ -739,7 +796,7 @@ export default function ConfirmBookingScreen() {
                                 {loadingPrice ? (
                                     <Text className="text-green-700 font-bold text-lg">...</Text>
                                 ) : (
-                                    <Text className="text-green-700 font-bold text-lg">฿{price}</Text>
+                                    <Text className="text-green-700 font-bold text-lg">฿{formatPrice(price)}</Text>
                                 )}
                             </View>
                         </View>
@@ -807,13 +864,70 @@ export default function ConfirmBookingScreen() {
                                             <Text className="text-gray-400 text-xs">{vehicle.id}</Text>
                                         </View>
                                         <Text className="font-bold text-gray-800">{vehicle.name}</Text>
-                                        <Text className="text-xs text-gray-500">Starts ฿{vehicle.basePrice}</Text>
-                                        <Text className="text-xs text-gray-500">Surcharge: ฿{vehicle.surcharge}</Text>
+                                        <Text className="text-primary font-bold">
+                                            ฿{selectedVehicle?.id === vehicle.id && !loadingPrice
+                                                ? formatPrice(price)
+                                                : formatPrice(Math.max(vehicle.minPrice || 0, Math.round(((vehicle.basePrice + (distance * vehicle.perKmRate) + (duration * (vehicle.perMinRate || 0))) * surgeMultiplier) + weightSurcharge)))
+                                            }
+                                        </Text>
+                                        <Text className="text-xs text-gray-500">+{t('pet_surcharge') || 'Pet'}: ฿{formatPrice(weightSurcharge)}</Text>
                                         {/* <Text className="text-xs text-gray-500">pet weight: {petWeight}</Text> */}
                                     </TouchableOpacity>
                                 ))}
                             </ScrollView>
                         )}
+
+                        {/* Payment Method Selection */}
+                        <Text className="text-lg font-bold mb-3 text-gray-900">{t('payment_method')}</Text>
+                        <View className="flex-row gap-4 mb-6">
+                            <TouchableOpacity
+                                onPress={() => setPaymentMethod('cash')}
+                                className={`flex-1 p-4 rounded-xl border-2 items-center flex-row ${paymentMethod === 'cash' ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white'}`}
+                            >
+                                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${paymentMethod === 'cash' ? 'bg-primary' : 'bg-gray-100'}`}>
+                                    <Wallet size={20} color={paymentMethod === 'cash' ? 'white' : 'gray'} />
+                                </View>
+                                <Text className={`font-semibold ${paymentMethod === 'cash' ? 'text-primary' : 'text-gray-500'}`}>{t('cash')}</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => setPaymentMethod('promptpay')}
+                                className={`flex-1 p-4 rounded-xl border-2 items-center flex-row ${paymentMethod === 'promptpay' ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white'}`}
+                            >
+                                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${paymentMethod === 'promptpay' ? 'bg-primary' : 'bg-gray-100'}`}>
+                                    <CreditCard size={20} color={paymentMethod === 'promptpay' ? 'white' : 'gray'} />
+                                </View>
+                                <Text className={`font-semibold ${paymentMethod === 'promptpay' ? 'text-primary' : 'text-gray-500'}`}>{t('promptpay')}</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => setPaymentMethod('wallet')}
+                                className={`flex-1 p-4 rounded-xl border-2 items-center flex-row ${paymentMethod === 'wallet' ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white'}`}
+                            >
+                                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${paymentMethod === 'wallet' ? 'bg-primary' : 'bg-gray-100'}`}>
+                                    <Wallet size={20} color={paymentMethod === 'wallet' ? 'white' : 'gray'} />
+                                </View>
+                                <View>
+                                    <Text className={`font-semibold ${paymentMethod === 'wallet' ? 'text-primary' : 'text-gray-500'}`}>วอลเล็ท</Text>
+                                    <Text className={`text-[10px] ${walletBalance < price ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
+                                        ฿{formatPrice(walletBalance)}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View className="flex-row gap-4 mb-6">
+                            <TouchableOpacity
+                                onPress={() => setPaymentMethod('stripe')}
+                                className={`flex-1 p-4 rounded-xl border-2 items-center flex-row ${paymentMethod === 'stripe' ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white'}`}
+                            >
+                                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${paymentMethod === 'stripe' ? 'bg-primary' : 'bg-gray-100'}`}>
+                                    <CreditCard size={20} color={paymentMethod === 'stripe' ? 'white' : 'gray'} />
+                                </View>
+                                <Text className={`font-semibold ${paymentMethod === 'stripe' ? 'text-primary' : 'text-gray-500'}`}>บัตรเครดิต</Text>
+                            </TouchableOpacity>
+                            <View className="flex-1" />
+                        </View>
 
                         {/* Note Input */}
                         <View className="bg-gray-50 p-4 rounded-xl mb-6">
@@ -838,8 +952,36 @@ export default function ConfirmBookingScreen() {
                 {bookingStatus === 'idle' && (
                     <View className="p-5 border-t border-gray-100 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] bg-white">
                         <View className="flex-row justify-between mb-2">
-                            <Text className="text-gray-500">pet weight ({petWeight.toFixed(1)}kg)</Text>
-                            <Text className="font-semibold text-gray-800">{loadingPrice ? '...' : '-'}</Text>
+                            <Text className="text-gray-500">{t('service_fare') || 'Service Fare'}</Text>
+                            <Text className="font-semibold text-gray-800">
+                                {loadingPrice ? '...' : `฿${formatPrice(Math.round((price - weightSurcharge) / surgeMultiplier))}`}
+                            </Text>
+                        </View>
+
+                        {surgeMultiplier > 1 && (
+                            <View className="flex-row justify-between mb-2">
+                                <View className="flex-1">
+                                    <Text className="text-orange-600 font-medium">Surge pricing ({surgeMultiplier}x)</Text>
+                                    <Text className="text-orange-400 text-xs">{surgeReasons.join(', ')}</Text>
+                                </View>
+                                <Text className="font-semibold text-orange-600">
+                                    +฿{formatPrice(price - weightSurcharge - Math.round((price - weightSurcharge) / surgeMultiplier))}
+                                </Text>
+                            </View>
+                        )}
+
+                        <View className="flex-row justify-between mb-2">
+                            <Text className="text-gray-500">{t('weight_kg') || 'Pet weight'} ({petWeight.toFixed(1)}kg)</Text>
+                            <Text className="font-semibold text-gray-800">
+                                {loadingPrice ? '...' : (weightSurcharge > 0 ? `+฿${formatPrice(weightSurcharge)}` : 'Free')}
+                            </Text>
+                        </View>
+
+                        <View className="flex-row justify-between mb-2">
+                            <Text className="text-gray-500">{t('payment_method')}</Text>
+                            <Text className="font-semibold text-gray-800">
+                                {paymentMethod === 'cash' ? t('cash') : paymentMethod === 'promptpay' ? t('promptpay') : paymentMethod === 'wallet' ? 'วอลเล็ท' : 'บัตรเครดิต'}
+                            </Text>
                         </View>
 
                         <View className="flex-row justify-between mb-6">
@@ -847,7 +989,7 @@ export default function ConfirmBookingScreen() {
                             {loadingPrice ? (
                                 <Text className="text-2xl font-bold text-primary">Loading...</Text>
                             ) : (
-                                <Text className="text-2xl font-bold text-primary">฿{price}</Text>
+                                <Text className="text-2xl font-bold text-primary">฿{formatPrice(price)}</Text>
                             )}
                         </View>
                         <AppButton
@@ -915,6 +1057,16 @@ export default function ConfirmBookingScreen() {
                             </TouchableOpacity>
                         </View>
 
+                        {(currentOrder?.status === 'in_progress' || currentOrder?.status === 'picked_up') && currentOrder?.payment_status !== 'paid' && (
+                            <TouchableOpacity
+                                className="w-full bg-blue-600 py-4 rounded-xl flex-row justify-center items-center mb-4"
+                                onPress={() => router.push(`/(customer)/payment/${currentOrder?.id}`)}
+                            >
+                                <CreditCard size={20} color="white" className="mr-2" />
+                                <Text className="text-white font-bold text-lg">Pay Now (฿{formatPrice(price)})</Text>
+                            </TouchableOpacity>
+                        )}
+
                         {(currentOrder?.status === 'accepted' || currentOrder?.status === 'pending') && (
                             <AppButton
                                 title="Cancel Booking"
@@ -924,13 +1076,18 @@ export default function ConfirmBookingScreen() {
                                         try {
                                             await orderService.cancelOrder(currentOrder.id, assignedDriver?.driver?.id);
                                             setBookingStatus('idle');
+                                            setCurrentOrder(null);
                                             setAssignedDriver(null);
-                                            Alert.alert('Booking Cancelled', 'Your booking has been cancelled.');
+                                            clearBooking();
+                                            Alert.alert('Booking Cancelled', 'Your booking has been cancelled.', [
+                                                { text: 'OK', onPress: () => router.replace('/(customer)/(tabs)/home') }
+                                            ]);
                                         } catch (error) {
                                             Alert.alert('Error', 'Failed to cancel booking');
                                         }
                                     } else {
                                         setBookingStatus('idle');
+                                        router.replace('/(customer)/(tabs)/home');
                                     }
                                 }}
                                 variant="outline"
@@ -941,6 +1098,6 @@ export default function ConfirmBookingScreen() {
                 )}
 
             </Animated.View>
-        </View>
+        </View >
     );
 }

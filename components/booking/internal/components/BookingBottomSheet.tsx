@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { AppButton } from '../../../../../components/ui/AppButton';
+import { formatPrice } from '../../../../../utils/format';
 export function BookingBottomSheet({
     distance,
     duration,
@@ -20,7 +21,7 @@ export function BookingBottomSheet({
 
             <View className="pt-4 border-t">
                 <Text className="text-xl font-bold mb-2">
-                    {loading ? 'Loading...' : `฿${price}`}
+                    {loading ? 'Loading...' : `฿${formatPrice(price)}`}
                 </Text>
                 <AppButton title="Confirm Booking" onPress={onConfirm} />
             </View>

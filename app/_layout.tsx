@@ -1,14 +1,24 @@
+import '../i18n';
+import '../global.css';
 import { Slot, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { useEffect } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { api } from '../services/api';
 import { View } from 'react-native';
-import '../global.css';
-import '../i18n';
+import { I18nextProvider } from 'react-i18next';
+import i18n from '../i18n';
+
+let StripeProvider: any;
+try {
+    StripeProvider = require('@stripe/stripe-react-native').StripeProvider;
+} catch (e) {
+    console.warn("Stripe native module not found. Stripe payments will be disabled.");
+    StripeProvider = ({ children }: any) => <>{children}</>;
+}
 
 // Initial Route Logic
-export default function RootLayout() {
+function RootLayout() {
     const { isAuthenticated, role } = useAuthStore();
     const segments = useSegments();
     const router = useRouter();
@@ -56,5 +66,16 @@ export default function RootLayout() {
         }
     }, [isAuthenticated, role, segments, navigationState?.key]);
 
-    return <Slot />;
+    return (
+        <I18nextProvider i18n={i18n}>
+            <StripeProvider
+                publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""}
+                merchantIdentifier="merchant.com.pettransport" // optional
+            >
+                <Slot />
+            </StripeProvider>
+        </I18nextProvider>
+    );
 }
+
+export default RootLayout;

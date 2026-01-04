@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 import { Order } from '../../../types/order';
 import * as Location from 'expo-location';
 import { api } from '../../../services/api';
+import { formatPrice } from '../../../utils/format';
 
 export default function DriverHomeScreen() {
     const { user } = useAuthStore();
@@ -187,7 +188,7 @@ export default function DriverHomeScreen() {
                         <Text className="text-green-700 font-bold text-xs">{distance} km</Text>
                     </View>
                     <Text className="text-xl font-bold text-green-600">
-                        ฿{job.price?.toFixed(0) || '-'}
+                        ฿{job.price ? formatPrice(job.price) : '-'}
                     </Text>
                 </View>
 

@@ -133,7 +133,8 @@ export default function DestinationScreen() {
                             value={pickupQuery}
                             onChangeText={setPickupQuery}
                             onFocus={() => setActiveField('pickup')}
-                            containerClassName={`mb-0 flex-1 ${activeField === 'pickup' ? 'border-blue-500 border' : 'border-gray-100'}`}
+                            containerClassName="mb-0 flex-1"
+                            inputContainerClassName={activeField === 'pickup' ? 'border-blue-500' : 'border-gray-100'}
                             className="bg-gray-50"
                         />
                     </View>
@@ -146,7 +147,8 @@ export default function DestinationScreen() {
                             value={dropoffQuery}
                             onChangeText={setDropoffQuery}
                             onFocus={() => setActiveField('dropoff')}
-                            containerClassName={`mb-0 flex-1 ${activeField === 'dropoff' ? 'border-blue-500 border' : 'border-gray-100'}`}
+                            containerClassName="mb-0 flex-1"
+                            inputContainerClassName={activeField === 'dropoff' ? 'border-blue-500' : 'border-gray-100'}
                             autoFocus={true} // Default focus on dropoff
                         />
                     </View>

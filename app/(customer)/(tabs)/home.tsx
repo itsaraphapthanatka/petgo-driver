@@ -47,6 +47,12 @@ export default function CustomerHome() {
     const [activeField, setActiveField] = React.useState<'pickup' | 'dropoff'>('dropoff'); // Default to dropoff
     const [loading, setLoading] = React.useState(false);
     const [results, setResults] = React.useState<SearchResult[]>([]);
+    const [region, setRegion] = React.useState({
+        latitude: 13.7563,
+        longitude: 100.5018,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+    });
 
     const LONGDO_API_KEY = process.env.EXPO_PUBLIC_LONGDO_MAP_API_KEY || '';
 
@@ -293,13 +299,13 @@ export default function CustomerHome() {
                 ref={mapRef}
                 provider={PROVIDER_GOOGLE}
                 style={{ flex: 1 }}
-
                 showsUserLocation={true}
                 showsMyLocationButton={false}
+                onRegionChangeComplete={setRegion}
             >
                 {/* Pickup Marker */}
                 {pickupLocation && (
-                    <Marker coordinate={{ latitude: pickupLocation.latitude, longitude: pickupLocation.longitude }} title={t('pickup') || 'Pickup'}>
+                    <Marker coordinate={{ latitude: pickupLocation.latitude, longitude: pickupLocation.longitude }} title={t('ตำแหน่งของคุณ') || 'Pickup'}>
                         <View className="bg-blue-500 p-1.5 rounded-full border border-white shadow-sm">
                             <MapPin size={16} color="white" />
                         </View>
@@ -308,7 +314,7 @@ export default function CustomerHome() {
 
                 {/* Dropoff Marker */}
                 {dropoffLocation && (
-                    <Marker coordinate={{ latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude }} title={t('dropoff') || 'Dropoff'}>
+                    <Marker coordinate={{ latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude }} title={t('สถานที่ปลายทาง') || 'Dropoff'}>
                         <View className="bg-red-500 p-1.5 rounded-full border border-white shadow-sm">
                             <MapPin size={16} color="white" />
                         </View>
@@ -344,15 +350,12 @@ export default function CustomerHome() {
                     )
                 )}
 
-
-
-
-
-
-
-
-                {/* Driver Markers */}
-                {driverLocations.map((driver) => (
+                {/* Driver Markers - Filtered by Viewport Radius */}
+                {driverLocations.filter(driver => {
+                    const latOk = Math.abs(driver.lat - region.latitude) <= region.latitudeDelta / 1.5;
+                    const lngOk = Math.abs(driver.lng - region.longitude) <= region.longitudeDelta / 1.5;
+                    return latOk && lngOk;
+                }).map((driver) => (
                     <Marker
                         key={`driver-${driver.id}`}
                         coordinate={{ latitude: driver.lat, longitude: driver.lng }}

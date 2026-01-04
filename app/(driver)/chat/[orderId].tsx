@@ -1,4 +1,5 @@
-import { View, FlatList, Text, KeyboardAvoidingView, Platform, TouchableOpacity, SafeAreaView, ActivityIndicator } from "react-native";
+import { View, FlatList, Text, KeyboardAvoidingView, Platform, TouchableOpacity, ActivityIndicator } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { connectChat, sendMessage, sendTyping, disconnectChat } from "../../../services/chatSocket";

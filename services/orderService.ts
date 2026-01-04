@@ -205,4 +205,19 @@ export const orderService = {
 
         return await response.json();
     },
+    payWithWallet: async (orderId: number): Promise<Order> => {
+        const token = await AsyncStorage.getItem(TOKEN_KEY);
+        const response = await fetch(`${API_BASE_URL}/orders/${orderId}/pay-wallet`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to pay with wallet');
+        }
+        return response.json();
+    }
 };

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, TrendingUp, DollarSign, Car } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { api } from '../../services/api';
+import { formatCurrency } from '../../utils/format';
 
 interface EarningsSummary {
     period: string;
@@ -37,9 +38,9 @@ export default function DriverEarningsScreen() {
     };
 
     const formatPeriodLabel = () => {
-        if (activeTab === 'daily') return 'วันนี้';
+        if (activeTab === 'daily') return '24 ชั่วโมงล่าสุด';
         if (activeTab === 'weekly') return '7 วันล่าสุด';
-        return 'เดือนนี้';
+        return '30 วันล่าสุด';
     };
 
     return (
@@ -58,8 +59,7 @@ export default function DriverEarningsScreen() {
                     onPress={() => setActiveTab('daily')}
                     className={`flex-1 py-4 ${activeTab === 'daily' ? 'border-b-2 border-green-500' : ''}`}
                 >
-                    <Text className={`text-center font-bold ${activeTab === 'daily' ? 'text-green-600' : 'text-gray-400'
-                        }`}>
+                    <Text className={`text-center font-bold ${activeTab === 'daily' ? 'text-green-600' : 'text-gray-400'}`}>
                         รายวัน
                     </Text>
                 </TouchableOpacity>
@@ -68,8 +68,7 @@ export default function DriverEarningsScreen() {
                     onPress={() => setActiveTab('weekly')}
                     className={`flex-1 py-4 ${activeTab === 'weekly' ? 'border-b-2 border-green-500' : ''}`}
                 >
-                    <Text className={`text-center font-bold ${activeTab === 'weekly' ? 'text-green-600' : 'text-gray-400'
-                        }`}>
+                    <Text className={`text-center font-bold ${activeTab === 'weekly' ? 'text-green-600' : 'text-gray-400'}`}>
                         รายสัปดาห์
                     </Text>
                 </TouchableOpacity>
@@ -78,8 +77,7 @@ export default function DriverEarningsScreen() {
                     onPress={() => setActiveTab('monthly')}
                     className={`flex-1 py-4 ${activeTab === 'monthly' ? 'border-b-2 border-green-500' : ''}`}
                 >
-                    <Text className={`text-center font-bold ${activeTab === 'monthly' ? 'text-green-600' : 'text-gray-400'
-                        }`}>
+                    <Text className={`text-center font-bold ${activeTab === 'monthly' ? 'text-green-600' : 'text-gray-400'}`}>
                         รายเดือน
                     </Text>
                 </TouchableOpacity>
@@ -126,21 +124,21 @@ export default function DriverEarningsScreen() {
                             <View className="flex-row justify-between items-center pb-3 border-b border-gray-100">
                                 <Text className="text-gray-600">ราคารวมทั้งหมด</Text>
                                 <Text className="text-lg font-semibold text-gray-800">
-                                    ฿{earnings.total_price.toFixed(2)}
+                                    ฿{formatCurrency(earnings.total_price, 2)}
                                 </Text>
                             </View>
 
                             <View className="flex-row justify-between items-center pb-3 border-b border-gray-100">
                                 <Text className="text-gray-600">ค่าบริการแอพ</Text>
                                 <Text className="text-lg font-semibold text-red-600">
-                                    -฿{earnings.total_platform_fee.toFixed(2)}
+                                    -฿{formatCurrency(earnings.total_platform_fee, 2)}
                                 </Text>
                             </View>
 
                             <View className="flex-row justify-between items-center pt-2">
                                 <Text className="text-lg font-bold text-gray-800">รายได้สุทธิ</Text>
                                 <Text className="text-2xl font-bold text-green-600">
-                                    ฿{earnings.total_driver_earnings.toFixed(2)}
+                                    ฿{formatCurrency(earnings.total_driver_earnings, 2)}
                                 </Text>
                             </View>
                         </View>
@@ -148,19 +146,19 @@ export default function DriverEarningsScreen() {
 
                     {/* Average Per Order */}
                     {earnings.total_orders > 0 && (
-                        <View className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-5">
+                        <View className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-5 mb-10">
                             <Text className="text-gray-700 font-bold mb-2">เฉลี่ยต่องาน</Text>
                             <View className="flex-row justify-between">
                                 <View>
                                     <Text className="text-xs text-gray-600">ราคารวม</Text>
                                     <Text className="text-lg font-bold text-gray-800">
-                                        ฿{(earnings.total_price / earnings.total_orders).toFixed(2)}
+                                        ฿{formatCurrency(earnings.total_price / earnings.total_orders, 2)}
                                     </Text>
                                 </View>
                                 <View>
                                     <Text className="text-xs text-gray-600 text-right">รายได้สุทธิ</Text>
                                     <Text className="text-lg font-bold text-green-600 text-right">
-                                        ฿{(earnings.total_driver_earnings / earnings.total_orders).toFixed(2)}
+                                        ฿{formatCurrency(earnings.total_driver_earnings / earnings.total_orders, 2)}
                                     </Text>
                                 </View>
                             </View>

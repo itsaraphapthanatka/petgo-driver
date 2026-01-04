@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Alert, ActivityIndicator, Animated, PanResponder, Dimensions, ScrollView, Platform, Linking } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { AppButton } from '../../../components/ui/AppButton';
-import { Phone, MessageCircle, ArrowLeft, Navigation as NavIcon, User } from 'lucide-react-native';
+import { Phone, MessageCircle, ArrowLeft, Navigation as NavIcon, User, Wallet, CreditCard } from 'lucide-react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useJobStore } from '../../../store/useJobStore';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -10,8 +10,9 @@ import { orderService } from '../../../services/orderService';
 import { Order } from '../../../types/order';
 import { hereMapApi, LatLng } from '../../../services/hereMapApi';
 import * as Location from 'expo-location';
+import { formatPrice } from '../../../utils/format';
 
-const HERE_API_KEY = "z8S6QWJ90hW5peIMiwDk9sCdlKEPj7cYiZz0fdoAbxU";
+const HERE_API_KEY = process.env.EXPO_PUBLIC_HERE_MAPS_API_KEY || "";
 
 export default function ActiveJobScreen() {
     const { id } = useLocalSearchParams();
@@ -266,11 +267,14 @@ export default function ActiveJobScreen() {
                 await orderService.updateOrderStatus(order.id, 'in_progress');
                 setStatus('in_progress');
             } else if (status === 'picked_up' || status === 'in_progress') {
+                if (order.payment_status !== 'paid') {
+                    // Force payment collection first
+                    router.push(`/(driver)/payment-collect/${order.id}`);
+                    return;
+                }
                 await orderService.updateOrderStatus(order.id, 'completed');
                 setStatus('completed');
-                Alert.alert("Job Completed", `Payment collected: ฿${order.price?.toFixed(0) || '-'}`, [
-                    { text: "OK", onPress: () => router.replace('/(driver)/(tabs)/home') }
-                ]);
+                router.replace(`/(driver)/payment-collect/${order.id}`);
             }
         } catch (error) {
             console.error('Failed to update status:', error);
@@ -447,7 +451,7 @@ export default function ActiveJobScreen() {
                                 </Text>
                             </View>
                             <View className="bg-green-100 px-3 py-1 rounded-full">
-                                <Text className="text-green-600 font-bold text-lg">฿{order.price?.toFixed(0) || '-'}</Text>
+                                <Text className="text-green-600 font-bold text-lg">฿{order.price ? formatPrice(order.price) : '-'}</Text>
                             </View>
                         </View>
 
@@ -513,6 +517,25 @@ export default function ActiveJobScreen() {
                             </View>
                         </View>
 
+                        <View className="mb-6 p-4 bg-gray-50 rounded-xl flex-row items-center">
+                            <View className="w-10 h-10 rounded-full bg-blue-100 items-center justify-center mr-3">
+                                {order.payment_method === 'cash' ? (
+                                    <Wallet size={20} color="#3B82F6" />
+                                ) : (
+                                    <CreditCard size={20} color="#3B82F6" />
+                                )}
+                            </View>
+                            <View className="flex-1">
+                                <Text className="text-xs text-gray-500 uppercase font-bold tracking-wider">Payment Method</Text>
+                                <Text className="text-gray-900 font-semibold capitalize">{order.payment_method || 'Cash'}</Text>
+                            </View>
+                            <View className={`px-3 py-1 rounded-full ${order.payment_status === 'paid' ? 'bg-green-100' : 'bg-orange-100'}`}>
+                                <Text className={`text-xs font-bold ${order.payment_status === 'paid' ? 'text-green-700' : 'text-orange-700'}`}>
+                                    {order.payment_status?.toUpperCase() || 'PENDING'}
+                                </Text>
+                            </View>
+                        </View>
+
                         {/* Cancel Button */}
                         <TouchableOpacity
                             onPress={() => {
@@ -554,14 +577,14 @@ export default function ActiveJobScreen() {
                         title={
                             status === 'accepted' ? 'Arrived at Pickup' :
                                 status === 'arrived' ? 'Start traveling' :
-                                    'Complete Job'
+                                    order.payment_status === 'paid' ? 'Complete Job' : 'Complete & Collect Payment'
                         }
                         onPress={handleAction}
                         className={status === 'in_progress' ? 'bg-red-500' : 'bg-green-600'}
                         size="lg"
                     />
                 </View>
-            </Animated.View>
-        </View>
+            </Animated.View >
+        </View >
     );
 }

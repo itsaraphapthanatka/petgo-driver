@@ -10,7 +10,15 @@ import {
     User,
 } from '../types/auth';
 
-const API_BASE_URL = Platform.OS === 'android' ? process.env.EXPO_PUBLIC_API_BASE_URL : process.env.EXPO_PUBLIC_API_BASE_URL;
+const getBaseUrl = () => {
+    let url = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.133:8000';
+    if (Platform.OS === 'android' && (url.includes('localhost') || url.includes('127.0.0.1'))) {
+        return url.replace('localhost', '10.0.2.2').replace('127.0.0.1', '10.0.2.2');
+    }
+    return url;
+};
+
+const API_BASE_URL = getBaseUrl();
 const TOKEN_KEY = '@pet_transport_token';
 
 // Token Management
@@ -113,7 +121,9 @@ export const authService = {
      */
     async requestOTP(phoneNumber: string): Promise<OTPResponse> {
         try {
-            const response = await fetch(`${API_BASE_URL}/auth/request-otp`, {
+            const url = `${API_BASE_URL}/auth/request-otp`;
+            console.log(`[authService] Requesting OTP from: ${url} with phone: ${phoneNumber}`);
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -174,7 +184,9 @@ export const authService = {
                 throw new Error('No authentication token found');
             }
 
-            const response = await fetch(`${API_BASE_URL}/auth/me`, {
+            const url = `${API_BASE_URL}/auth/me`;
+            console.log(`[authService] Fetching current user from: ${url}`);
+            const response = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,

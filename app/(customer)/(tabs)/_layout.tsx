@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, ClipboardList, Wallet, User } from 'lucide-react-native';
+import { Home, ClipboardList, User, Wallet } from 'lucide-react-native';
 import { COLORS } from '../../../utils/theme';
 
 export default function CustomerTabs() {
@@ -16,28 +16,28 @@ export default function CustomerTabs() {
             <Tabs.Screen
                 name="home"
                 options={{
-                    title: 'Home',
+                    title: 'หน้าแรก',
                     tabBarIcon: ({ color }) => <Home size={24} color={color} />
                 }}
             />
             <Tabs.Screen
-                name="activity"
+                name="history"
                 options={{
-                    title: 'Activity',
+                    title: 'ประวัติ',
                     tabBarIcon: ({ color }) => <ClipboardList size={24} color={color} />
                 }}
             />
             <Tabs.Screen
                 name="wallet"
                 options={{
-                    title: 'Wallet',
+                    title: 'วอลเล็ท',
                     tabBarIcon: ({ color }) => <Wallet size={24} color={color} />
                 }}
             />
             <Tabs.Screen
                 name="profile"
                 options={{
-                    title: 'Profile',
+                    title: 'โปรไฟล์',
                     tabBarIcon: ({ color }) => <User size={24} color={color} />
                 }}
             />

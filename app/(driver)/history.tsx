@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import { orderService } from '../../services/orderService';
 import { Order } from '../../types/order';
 import { useAuthStore } from '../../store/useAuthStore';
+import { formatCurrency, formatPrice } from '../../utils/format';
 
 export default function DriverHistoryScreen() {
     const { user } = useAuthStore();
@@ -23,8 +24,9 @@ export default function DriverHistoryScreen() {
             const allOrders = await orderService.getOrders();
 
             // Filter completed and cancelled orders for current driver
+            // Include active statuses so they are not "missing" in history
             const completed = allOrders.filter(
-                order => order.status === 'completed' && order.driver?.user_id === user?.id
+                order => (order.status === 'completed' || ['accepted', 'arrived', 'in_progress'].includes(order.status || '')) && order.driver?.user_id === user?.id
             );
             const cancelled = allOrders.filter(
                 order => order.status === 'cancelled' && order.driver?.user_id === user?.id
@@ -40,7 +42,10 @@ export default function DriverHistoryScreen() {
     };
 
     const formatDate = (dateString: string) => {
+        if (!dateString) return '-';
         const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '-';
+
         return date.toLocaleDateString('th-TH', {
             year: 'numeric',
             month: 'short',
@@ -53,18 +58,25 @@ export default function DriverHistoryScreen() {
     const renderOrderCard = (order: Order) => (
         <TouchableOpacity
             key={order.id}
+            onPress={() => router.push(`/(driver)/job/${order.id}`)}
             className="bg-white p-4 rounded-xl mb-3 border border-gray-200"
         >
             <View className="flex-row justify-between items-start mb-3">
                 <View className="flex-1">
                     <Text className="text-xs text-gray-500 mb-1">รหัสงาน #{order.id}</Text>
-                    <Text className="text-xs text-gray-400">{formatDate(order.created_at || '')}</Text>
+                    <Text className="text-sm font-bold text-gray-800">{order.customer?.full_name || 'ลูกค้า'}</Text>
+                    <Text className="text-xs text-gray-400 mt-0.5">{formatDate(order.created_at || '')}</Text>
                 </View>
-                <View className={`px-3 py-1 rounded-full ${order.status === 'completed' ? 'bg-green-100' : 'bg-red-100'
+                <View className={`px-3 py-1 rounded-full ${order.status === 'completed' ? 'bg-green-100' :
+                    order.status === 'cancelled' ? 'bg-red-100' : 'bg-blue-100'
                     }`}>
-                    <Text className={`text-xs font-bold ${order.status === 'completed' ? 'text-green-700' : 'text-red-700'
+                    <Text className={`text-xs font-bold ${order.status === 'completed' ? 'text-green-700' :
+                        order.status === 'cancelled' ? 'text-red-700' : 'text-blue-700'
                         }`}>
-                        {order.status === 'completed' ? 'เสร็จสิ้น' : 'ยกเลิก'}
+                        {order.status === 'completed' ? 'เสร็จสิ้น' :
+                            order.status === 'cancelled' ? 'ยกเลิก' :
+                                order.status === 'arrived' ? 'มาถึงแล้ว' :
+                                    order.status === 'accepted' ? 'รับงานแล้ว' : 'กำลังดำเนินการ'}
                     </Text>
                 </View>
             </View>
@@ -91,51 +103,55 @@ export default function DriverHistoryScreen() {
             </View>
 
             <View className="pt-3 border-t border-gray-100">
-                <View className="flex-row items-center mb-2">
-                    <Text className="text-xs text-gray-500 mr-1">สัตว์เลี้ยง:</Text>
-                    <View>
-                        {order.pets && order.pets.length > 0 ? (
-                            order.pets.map((pet, index) => (
-                                <View key={pet.id || index}>
-                                    <Text className="text-sm font-medium text-gray-800">
-                                        {pet.name} <Text className="text-xs font-normal text-gray-500">({pet.type}, {pet.weight}kg)</Text>
-                                    </Text>
-                                </View>
-                            ))
-                        ) : (
-                            <Text className="text-sm font-medium text-gray-800">
-                                {order.pet_details || order.pet?.name || '-'}
-                            </Text>
-                        )}
-                        {order.passengers && (
-                            <Text className="text-xs text-gray-500">
-                                (Passengers: {order.passengers})
-                            </Text>
-                        )}
+                {order.status !== 'cancelled' && (
+                    <View className="flex-row items-center mb-2">
+                        <Text className="text-xs text-gray-500 mr-1">สัตว์เลี้ยง:</Text>
+                        <View>
+                            {order.pets && order.pets.length > 0 ? (
+                                order.pets.map((pet, index) => (
+                                    <View key={pet.id || index}>
+                                        <Text className="text-sm font-medium text-gray-800">
+                                            {pet.name} <Text className="text-xs font-normal text-gray-500">({pet.type}, {pet.weight}kg)</Text>
+                                        </Text>
+                                    </View>
+                                ))
+                            ) : (
+                                <Text className="text-sm font-medium text-gray-800">
+                                    {order.pet_details || order.pet?.name || '-'}
+                                </Text>
+                            )}
+                            {order.passengers && (
+                                <Text className="text-xs text-gray-500">
+                                    (Passengers: {order.passengers})
+                                </Text>
+                            )}
+                        </View>
                     </View>
-                </View>
+                )}
 
-                {/* Commission Breakdown */}
-                <View className="bg-gray-50 p-3 rounded-lg mt-2">
-                    <View className="flex-row justify-between mb-1">
-                        <Text className="text-xs text-gray-600">ราคารวม</Text>
-                        <Text className="text-sm font-medium text-gray-800">
-                            ฿{order.price?.toFixed(2) || '-'}
-                        </Text>
+                {/* Commission Breakdown - Only show for completed orders */}
+                {order.status !== 'cancelled' && (
+                    <View className="bg-gray-50 p-3 rounded-lg mt-2">
+                        <View className="flex-row justify-between mb-1">
+                            <Text className="text-xs text-gray-600">ราคารวม</Text>
+                            <Text className="text-sm font-medium text-gray-800">
+                                ฿{formatPrice(order.price)}
+                            </Text>
+                        </View>
+                        <View className="flex-row justify-between mb-1">
+                            <Text className="text-xs text-gray-500">Commission App</Text>
+                            <Text className="text-xs text-red-600">
+                                -฿{formatCurrency(order.platform_fee, 2)}
+                            </Text>
+                        </View>
+                        <View className="flex-row justify-between pt-2 border-t border-gray-200">
+                            <Text className="text-sm font-bold text-gray-800">รายได้สุทธิ</Text>
+                            <Text className="text-lg font-bold text-green-600">
+                                ฿{formatCurrency(order.driver_earnings, 2)}
+                            </Text>
+                        </View>
                     </View>
-                    <View className="flex-row justify-between mb-1">
-                        <Text className="text-xs text-gray-500">Commission App</Text>
-                        <Text className="text-xs text-red-600">
-                            -฿{order.platform_fee?.toFixed(2) || '0.00'}
-                        </Text>
-                    </View>
-                    <View className="flex-row justify-between pt-2 border-t border-gray-200">
-                        <Text className="text-sm font-bold text-gray-800">รายได้สุทธิ</Text>
-                        <Text className="text-lg font-bold text-green-600">
-                            ฿{order.driver_earnings?.toFixed(2) || '-'}
-                        </Text>
-                    </View>
-                </View>
+                )}
             </View>
         </TouchableOpacity>
     );

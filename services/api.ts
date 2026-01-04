@@ -13,6 +13,27 @@ export interface PricingResponse {
     estimated_price: number;
     distance_km: number;
     duration_min: number;
+    weight_surcharge: number;
+    surge_multiplier: number;
+    surge_reasons: string[];
+}
+
+export interface PaymentCreate {
+    order_id: number;
+    amount: number;
+    method: string; // cash, promptpay, etc.
+    status?: string;
+    transaction_id?: string;
+}
+
+export interface PaymentResponse {
+    id: number;
+    order_id: number;
+    amount: number;
+    method: string;
+    status: string;
+    transaction_id?: string;
+    created_at: string;
 }
 
 export interface DriverDetails {
@@ -59,7 +80,15 @@ export interface PricingSettings {
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = Platform.OS === 'android' ? process.env.EXPO_PUBLIC_API_BASE_URL : process.env.EXPO_PUBLIC_API_BASE_URL;
+const getBaseUrl = () => {
+    let url = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.133:8000';
+    if (Platform.OS === 'android' && (url.includes('localhost') || url.includes('127.0.0.1'))) {
+        return url.replace('localhost', '10.0.2.2').replace('127.0.0.1', '10.0.2.2');
+    }
+    return url;
+};
+
+const API_BASE_URL = getBaseUrl();
 const TOKEN_KEY = '@pet_transport_token';
 
 // Helper function to get auth headers
@@ -321,5 +350,118 @@ export const api = {
             console.warn('Could not fetch driver stats', error);
             throw error;
         }
+    },
+
+    // ---------- Payments ----------
+    createPayment: async (data: PaymentCreate): Promise<PaymentResponse> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/payments/`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error('Failed to create payment');
+        return response.json();
+    },
+
+    getPayment: async (paymentId: number): Promise<PaymentResponse> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/payments/${paymentId}`, { headers });
+        if (!response.ok) throw new Error('Failed to fetch payment');
+        return response.json();
+    },
+
+    verifyPayment: async (paymentId: number, status: string, transactionId?: string): Promise<PaymentResponse> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/payments/${paymentId}/verify?status=${status}${transactionId ? `&transaction_id=${transactionId}` : ''}`, {
+            method: 'POST',
+            headers
+        });
+        if (!response.ok) throw new Error('Failed to verify payment');
+        return response.json();
+    },
+    getPaymentByOrderId: async (orderId: number): Promise<PaymentResponse> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/payments/order/${orderId}`, { headers });
+        if (!response.ok) throw new Error('Failed to fetch payment by order ID');
+        return response.json();
+    },
+
+    createPaymentIntent: async (data: PaymentCreate): Promise<any> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/payments/create-payment-intent`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error('Failed to create payment intent');
+        return response.json();
+    },
+
+    // ---------- Wallet ----------
+    getWalletBalance: async (): Promise<any> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/wallet/balance`, { headers });
+        if (!response.ok) throw new Error('Failed to fetch wallet balance');
+        return response.json();
+    },
+
+    getWalletTransactions: async (): Promise<any[]> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/wallet/transactions`, { headers });
+        if (!response.ok) throw new Error('Failed to fetch transactions');
+        return response.json();
+    },
+
+    topupWallet: async (amount: number, method: string = 'promptpay'): Promise<any> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/wallet/topup`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ amount, method })
+        });
+        if (!response.ok) throw new Error('Failed to topup wallet');
+        return response.json();
+    },
+
+    verifyTopup: async (transactionId: number): Promise<any> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/wallet/verify-topup/${transactionId}`, {
+            method: 'POST',
+            headers
+        });
+        if (!response.ok) throw new Error('Failed to verify topup');
+        return response.json();
+    },
+
+    createSetupIntent: async (): Promise<any> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/payments/setup-intent`, {
+            method: 'POST',
+            headers
+        });
+        if (!response.ok) throw new Error('Failed to create setup intent');
+        return response.json();
+    },
+
+    getPaymentMethods: async (): Promise<any[]> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/payments/payment-methods`, { headers });
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Failed to fetch payment methods:', errorText);
+            throw new Error(`Failed to fetch payment methods: ${errorText}`);
+        }
+        return response.json();
+    },
+
+    detachPaymentMethod: async (pmId: string): Promise<any> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/payments/payment-methods/${pmId}`, {
+            method: 'DELETE',
+            headers
+        });
+        if (!response.ok) throw new Error('Failed to detach payment method');
+        return response.json();
     }
 };

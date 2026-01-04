@@ -19,11 +19,13 @@ const resources = {
             no_location_found: "No locations found",
             enter_destination: "Enter a destination",
             pick_up: "Pick Up",
+            pickup: "Pickup",
             drop_off: "Drop Off",
             confirm_booking: "Confirm Booking",
             distance: "Distance",
             pet_surcharge: "Pet Surcharge",
             total: "Total",
+            service_fare: "Service Fare",
             onboarding: {
                 slide1_title: "Safe Transport for your Buddy",
                 slide1_subtitle: "Professional drivers trained to handle pets with care and love.",
@@ -69,12 +71,29 @@ const resources = {
             travel_tips_desc: "Pets don't need cages, but we recommend bringing a blanket and small cleaning supplies just in case!",
             limit_reached: "Limit Reached",
             alone_limit_desc: "Traveling alone: You can bring up to 2 small pets.",
-            group_limit_desc: "Traveling with 2+ people: You can bring only 1 pet."
+            group_limit_desc: "Traveling with 2+ people: You can bring only 1 pet.",
+            payment_method: "Payment Method",
+            cash: "Cash",
+            promptpay: "PromptPay / Transfer",
+            payment_collection: "Payment Collection",
+            collect_from_customer: "Collect from customer",
+            paid_online: "Paid Online",
+            finish_job: "Finish Job",
+            journey_completed: "Journey Completed",
+            amount_paid: "Total Paid",
+            amount_to_pay: "Total to Pay",
+            paid: "PAID",
+            pending: "PENDING",
+            date: "Date",
+            trip_details: "Trip Details",
+            back_to_home: "Back to Home",
+            driver: "Driver"
         }
     },
     th: {
         translation: {
             welcome: "ยินดีต้อนรับสู่ Pet Transport",
+            pickup: "ตำแหน่งของคุณ",
             onboarding: {
                 slide1_title: "ขนส่งสัตว์เลี้ยงของคุณอย่างปลอดภัย",
                 slide1_subtitle: "ผู้ขับขี่ที่ได้รับการฝึกอบรมเพื่อให้สัตว์เลี้ยงของคุณได้รับการดูแลอย่างดี",
@@ -115,6 +134,7 @@ const resources = {
             distance: "ระยะทาง",
             pet_surcharge: "ค่าธรรมเนียมสัตว์เลี้ยง",
             total: "ราคารวม",
+            service_fare: "ค่าบริการปกติ",
             select_passenger: "เลือกผู้โดยสาร",
             how_many_people: "เดินทางกี่คน?",
             travel_alone: "เดินทางคนเดียว",
@@ -132,7 +152,23 @@ const resources = {
             travel_tips_desc: "สัตว์เลี้ยงไม่จำเป็นต้องใส่กรง แต่แนะนำ ผ้าห่ม + อุปกรณ์ทำความสะอาดเล็ก ๆ เผื่อสัตว์เลี้ยงเลอะ",
             limit_reached: "เกินขีดจำกัด",
             alone_limit_desc: "เดินทางคนเดียว: พา สัตว์เลี้ยงเล็ก 2 ตัว ได้",
-            group_limit_desc: "เดินทาง 2 คนขึ้นไป: พา สัตว์เลี้ยง 1 ตัว"
+            group_limit_desc: "เดินทาง 2 คนขึ้นไป: พา สัตว์เลี้ยง 1 ตัว",
+            payment_method: "วิธีชำระเงิน",
+            cash: "เงินสด",
+            promptpay: "พร้อมเพย์ / โอนเงิน",
+            payment_collection: "ยอดที่ต้องเก็บ",
+            collect_from_customer: "เก็บเงินจากลูกค้า",
+            paid_online: "จ่ายออนไลน์แล้ว",
+            finish_job: "จบงาน",
+            journey_completed: "การเดินทางเสร็จสิ้น",
+            amount_paid: "ยอดชำระแล้ว",
+            amount_to_pay: "ยอดที่ต้องชำระ",
+            paid: "ชำระแล้ว",
+            pending: "รอดำเนินการ",
+            date: "วันที่",
+            trip_details: "รายละเอียดการเดินทาง",
+            back_to_home: "กลับสู่หน้าหลัก",
+            driver: "คนขับ"
         }
     }
 };

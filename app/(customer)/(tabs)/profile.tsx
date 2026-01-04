@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { LogOut, Globe, ChevronRight } from 'lucide-react-native';
+import { LogOut, Globe, ChevronRight, CreditCard } from 'lucide-react-native';
 
 export default function ProfileScreen() {
     const { logout, user } = useAuthStore();
@@ -28,6 +28,24 @@ export default function ProfileScreen() {
             </View>
 
             <ScrollView className="flex-1 px-4">
+                {/* Payments */}
+                <View className="bg-white rounded-xl p-4 mb-4 shadow-sm">
+                    <Text className="text-sm font-semibold text-gray-500 mb-3 uppercase tracking-wider">Payments</Text>
+
+                    <TouchableOpacity
+                        onPress={() => router.push('/(customer)/payment-methods')}
+                        className="flex-row items-center justify-between py-2"
+                    >
+                        <View className="flex-row items-center">
+                            <View className="w-8 h-8 bg-green-50 rounded-full items-center justify-center mr-3">
+                                <CreditCard size={18} color="#00A862" />
+                            </View>
+                            <Text className="text-gray-700 font-medium">Payment Methods</Text>
+                        </View>
+                        <ChevronRight size={20} color="#D1D5DB" />
+                    </TouchableOpacity>
+                </View>
+
                 {/* Language Setting */}
                 <View className="bg-white rounded-xl p-4 mb-4 shadow-sm">
                     <Text className="text-sm font-semibold text-gray-500 mb-3 uppercase tracking-wider">Settings</Text>
@@ -37,10 +55,10 @@ export default function ProfileScreen() {
                             <View className="w-8 h-8 bg-blue-50 rounded-full items-center justify-center mr-3">
                                 <Globe size={18} color="#3B82F6" />
                             </View>
-                            <Text className="text-gray-700 font-medium">Language ({i18n.language.toUpperCase()})</Text>
+                            <Text className="text-gray-700 font-medium">Language ({(i18n.language || 'th').toUpperCase()})</Text>
                         </View>
                         <TouchableOpacity onPress={toggleLanguage} className="bg-gray-100 px-3 py-1.5 rounded-full">
-                            <Text className="text-primary font-semibold">{i18n.language === 'en' ? 'ไทย' : 'English'}</Text>
+                            <Text className="text-primary font-semibold">{(i18n.language || 'th') === 'en' ? 'ไทย' : 'English'}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

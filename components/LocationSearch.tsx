@@ -49,7 +49,8 @@ export const LocationSearch: React.FC<LocationSearchProps> = ({
                             value={pickupQuery}
                             onChangeText={setPickupQuery}
                             onFocus={() => setActiveField('pickup')}
-                            containerClassName={`mb-0 flex-1 h-10 ${activeField === 'pickup' ? 'border-blue-500 border' : 'border-gray-100'}`}
+                            containerClassName="mb-0 flex-1 h-10"
+                            inputContainerClassName={activeField === 'pickup' ? 'border-blue-500' : 'border-gray-100'}
                             className="bg-gray-50 text-sm"
                         />
                     </View>
@@ -62,7 +63,8 @@ export const LocationSearch: React.FC<LocationSearchProps> = ({
                             value={dropoffQuery}
                             onChangeText={setDropoffQuery}
                             onFocus={() => setActiveField('dropoff')}
-                            containerClassName={`mb-0 flex-1 h-10 ${activeField === 'dropoff' ? 'border-blue-500 border' : 'border-gray-100'}`}
+                            containerClassName="mb-0 flex-1 h-10"
+                            inputContainerClassName={activeField === 'dropoff' ? 'border-blue-500' : 'border-gray-100'}
                             className="bg-gray-50 text-sm"
                         />
                     </View>

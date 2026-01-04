@@ -50,6 +50,8 @@ export interface Order {
     driver?: DriverOut | null;
     customer_lat?: number;
     customer_lng?: number;
+    payment_status?: string;
+    payment_method?: string;
     created_at: string;
     pet: PetOut;
     pets: PetOut[]; // New array
@@ -72,4 +74,6 @@ export interface OrderCreate {
     pet_details?: string;
     customer_lat?: number;
     customer_lng?: number;
+    payment_status?: string;
+    payment_method?: string;
 }

@@ -56,7 +56,7 @@ export default function OnboardingScreen() {
                     className="bg-white px-3 py-1.5 rounded-full shadow-sm"
                 >
                     <Text className="font-bold text-gray-800 text-sm">
-                        {i18n.language.startsWith('en') ? '🇹🇭 TH' : '🇬🇧 EN'}
+                        {(i18n.language || 'en').startsWith('en') ? '🇹🇭 TH' : '🇬🇧 EN'}
                     </Text>
                 </TouchableOpacity>
 
