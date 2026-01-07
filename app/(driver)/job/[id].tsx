@@ -11,6 +11,7 @@ import { PetGoCarIcon } from '../../../components/icons/PetGoCarIcon';
 import { useJobStore } from '../../../store/useJobStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { orderService } from '../../../services/orderService';
+import { api } from '../../../services/api';
 import { Order } from '../../../types/order';
 import { hereMapApi, LatLng } from '../../../services/hereMapApi';
 import * as Location from 'expo-location';
@@ -28,6 +29,9 @@ export default function ActiveJobScreen() {
     const [order, setOrder] = useState<Order | null>(null);
     const [routeCoordinates, setRouteCoordinates] = useState<LatLng[]>([]);
     const [currentLocation, setCurrentLocation] = useState<LatLng | null>(null);
+    const [showQRModal, setShowQRModal] = useState(false);
+    const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+    const [isFetchingQR, setIsFetchingQR] = useState(false);
 
     // Pulse Animation for Customer Location
     const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -230,6 +234,38 @@ export default function ActiveJobScreen() {
         };
     }, [id]);
 
+    // Auto-close QR Modal if paid
+    useEffect(() => {
+        if (order?.payment_status === 'paid' && showQRModal) {
+            setShowQRModal(false);
+            Alert.alert("Payment Received", "The customer has successfully paid via PromptPay.", [
+                { text: "OK", onPress: () => router.replace('/(driver)/(tabs)/home') }
+            ]);
+        }
+    }, [order?.payment_status, showQRModal]);
+
+    const fetchQR = async () => {
+        if (!order) return;
+        setIsFetchingQR(true);
+        setShowQRModal(true);
+        try {
+            const result = await api.createPaymentIntent({
+                order_id: order.id,
+                amount: order.price || 0,
+                method: 'promptpay'
+            });
+            if (result.qr_code_url) {
+                setQrCodeUrl(result.qr_code_url);
+            }
+        } catch (error) {
+            console.error("Failed to fetch PromptPay QR:", error);
+            Alert.alert("Error", "Could not generate PromptPay QR code.");
+            setShowQRModal(false);
+        } finally {
+            setIsFetchingQR(false);
+        }
+    };
+
     const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
         const R = 6371e3; // metres
         const φ1 = lat1 * Math.PI / 180;
@@ -272,14 +308,26 @@ export default function ActiveJobScreen() {
                 await orderService.updateOrderStatus(order.id, 'in_progress');
                 setStatus('in_progress');
             } else if (status === 'picked_up' || status === 'in_progress') {
-                if (order.payment_status !== 'paid') {
-                    // Force payment collection first
+                if (order.payment_method === 'cash' && order.payment_status !== 'paid') {
+                    // Force payment collection for cash
                     router.push(`/(driver)/payment-collect/${order.id}`);
                     return;
                 }
+
+                // For Stripe or Wallet, we mark as completed
                 await orderService.updateOrderStatus(order.id, 'completed');
                 setStatus('completed');
-                router.replace(`/(driver)/payment-collect/${order.id}`);
+
+                if (order.payment_method === 'promptpay' && order.payment_status !== 'paid') {
+                    // Automatically show QR code after marking as completed for PromptPay
+                    fetchQR();
+                } else if (order.payment_method === 'cash') {
+                    router.replace(`/(driver)/payment-collect/${order.id}`);
+                } else {
+                    Alert.alert("Success", "Job completed successfully!", [
+                        { text: "OK", onPress: () => router.replace('/(driver)/(tabs)/home') }
+                    ]);
+                }
             }
         } catch (error) {
             console.error('Failed to update status:', error);
@@ -600,7 +648,7 @@ export default function ActiveJobScreen() {
                     </ScrollView>
                 </View>
 
-                <View className="absolute bottom-0 left-0 right-0 p-5 bg-white border-t border-gray-100 pb-10">
+                <View className="absolute bottom-0 left-0 right-0 p-5 bg-white border-t border-gray-100 pb-20">
                     <AppButton
                         title={
                             status === 'accepted' ? t('arrived_at_pickup') :
@@ -613,6 +661,60 @@ export default function ActiveJobScreen() {
                     />
                 </View>
             </Animated.View >
+
+            {/* PromptPay QR Modal */}
+            <Modal
+                visible={showQRModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowQRModal(false)}
+            >
+                <View className="flex-1 bg-black/60 items-center justify-center p-6">
+                    <View className="bg-white w-full rounded-3xl p-6 items-center">
+                        <View className="w-full flex-row justify-between items-center mb-6">
+                            <Text className="text-xl font-bold text-gray-900">Scan to Pay (PromptPay)</Text>
+                            <TouchableOpacity onPress={() => setShowQRModal(false)}>
+                                <XCircle size={28} color="#9CA3AF" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View className="bg-gray-50 p-6 rounded-3xl border border-gray-100 mb-6">
+                            {isFetchingQR ? (
+                                <View style={{ width: 250, height: 250, justifyContent: 'center', alignItems: 'center' }}>
+                                    <ActivityIndicator size="large" color="#3B82F6" />
+                                    <Text className="mt-4 text-gray-500">Generating QR Code...</Text>
+                                </View>
+                            ) : qrCodeUrl ? (
+                                <Image
+                                    source={{ uri: qrCodeUrl }}
+                                    style={{ width: 250, height: 250 }}
+                                    resizeMode="contain"
+                                />
+                            ) : (
+                                <View style={{ width: 250, height: 250, justifyContent: 'center', alignItems: 'center' }}>
+                                    <Text className="text-red-500">Failed to load QR</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        <View className="items-center mb-8">
+                            <Text className="text-gray-500 mb-1">Total Amount</Text>
+                            <Text className="text-3xl font-black text-gray-900">฿{order ? formatPrice(order.price) : '-'}</Text>
+                        </View>
+
+                        <Text className="text-gray-400 text-center text-xs mb-6">
+                            Please show this QR code to the customer. The screen will automatically update once payment is confirmed.
+                        </Text>
+
+                        <AppButton
+                            title="Close"
+                            variant="secondary"
+                            onPress={() => setShowQRModal(false)}
+                            className="w-full"
+                        />
+                    </View>
+                </View>
+            </Modal>
         </View >
     );
 }
