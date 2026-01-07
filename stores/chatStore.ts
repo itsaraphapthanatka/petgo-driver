@@ -17,38 +17,41 @@ export const useChatStore = create<ChatState>((set) => ({
     addMessage: (msg: ChatMessage) =>
         set((state) => {
             // Deduplication logic
-            const isDuplicate = state.messages.some(existingMsg => {
-                // 1. If both have IDs, compare IDs
-                if (msg.id && existingMsg.id) {
-                    return msg.id === existingMsg.id;
+            const existingIndex = state.messages.findIndex(m => {
+                // 1. Exact ID match
+                if (msg.id && m.id) return msg.id === m.id;
+
+                // 2. Match optimistic message with server confirmation
+                // If msg has ID and m doesn't, check if they are "same enough"
+                if (msg.id && !m.id) {
+                    return (
+                        m.message === msg.message &&
+                        m.user_id === msg.user_id &&
+                        m.role === msg.role
+                    );
                 }
 
-                // 2. Fallback for optimistic updates (no ID yet)
-                // Check if content, sender, and approximate time match
-                const timeDiff = Math.abs(
-                    new Date(msg.created_at || '').getTime() -
-                    new Date(existingMsg.created_at || '').getTime()
-                );
+                // 3. Match incoming optimistic with existing optimistic
+                if (!msg.id && !m.id) {
+                    return (
+                        m.message === msg.message &&
+                        m.user_id === msg.user_id &&
+                        m.role === msg.role &&
+                        Math.abs(new Date(msg.created_at || '').getTime() - new Date(m.created_at || '').getTime()) < 10000
+                    );
+                }
 
-                return (
-                    msg.message === existingMsg.message &&
-                    msg.role === existingMsg.role &&
-                    msg.user_id === existingMsg.user_id &&
-                    timeDiff < 5000 // Within 5 seconds
-                );
+                return false;
             });
 
-            if (isDuplicate) {
-                // If the incoming message has an ID but the stored one doesn't,
-                // replace the optimistic message with the server-confirmed one.
-                if (msg.id) {
-                    return {
-                        messages: state.messages.map(m =>
-                            (!m.id && m.message === msg.message && m.user_id === msg.user_id)
-                                ? msg : m
-                        )
-                    };
+            if (existingIndex !== -1) {
+                // If the new message has more info (like an ID), update the existing one
+                if (msg.id && !state.messages[existingIndex].id) {
+                    const newMessages = [...state.messages];
+                    newMessages[existingIndex] = msg;
+                    return { messages: newMessages };
                 }
+                // Otherwise, it's a true duplicate, ignore it
                 return state;
             }
 
