@@ -51,7 +51,7 @@ export const useJobStore = create<JobState>((set, get) => ({
             return acceptedOrder;
         } catch (error: any) {
             console.error('Failed to accept job:', error);
-            set({ error: error.message, isLoading: false });
+            set({ isLoading: false });
             throw error;
         }
     },

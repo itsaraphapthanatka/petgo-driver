@@ -3,7 +3,7 @@ import { View, Text, Image, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { AppButton } from '../../../components/ui/AppButton';
-import { User, LogOut, ChevronRight, Settings, Shield, History, TrendingUp } from 'lucide-react-native';
+import { User, LogOut, ChevronRight, Settings, Shield, History, TrendingUp, Wallet } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { api } from '../../../services/api';
 
@@ -44,15 +44,20 @@ export default function DriverProfileScreen() {
         router.push('/(driver)/earnings');
     };
 
+    const handleNavigateToWallet = () => {
+        router.push('/(driver)/wallet');
+    };
+
     const menuItems = [
         { icon: TrendingUp, label: 'สรุปรายได้', screen: 'earnings', onPress: handleNavigateToEarnings },
+        { icon: Wallet, label: 'กระเป๋าเงิน & การเบิกเงิน', screen: 'wallet', onPress: handleNavigateToWallet },
         { icon: History, label: 'ประวัติรับงาน', screen: 'history', onPress: handleNavigateToHistory },
         { icon: Settings, label: 'Settings', screen: 'settings', onPress: handleNavigateToSettings },
         { icon: Shield, label: 'Privacy & Security', screen: 'privacy' },
     ];
 
     return (
-        <SafeAreaView className="flex-1 bg-gray-50">
+        <SafeAreaView className="flex-1 bg-gray-50" edges={['top', 'left', 'right']}>
             <ScrollView contentContainerStyle={{ padding: 20 }}>
                 {/* Header */}
                 <View className="items-center mb-8 mt-4">

@@ -6,7 +6,11 @@ const resources = {
     en: {
         translation: {
             welcome: "Welcome to Pet Transport",
+<<<<<<< HEAD
             login: "PetGo",
+=======
+            login: "PetGo Driver",
+>>>>>>> 84c5a5c (feat: Configure app as petgo-driver, update authenticated navigation, and enhance chat message deduplication logic.)
             register: "Register",
             home: "Home",
             profile: "Profile",
@@ -38,7 +42,11 @@ const resources = {
                 get_started: "Get Started"
             },
             login_screen: {
+<<<<<<< HEAD
                 title: "PetGo",
+=======
+                title: "PetGo Driver",
+>>>>>>> 84c5a5c (feat: Configure app as petgo-driver, update authenticated navigation, and enhance chat message deduplication logic.)
                 subtitle: "Login to your account",
                 email: "Email",
                 password: "Password",

@@ -1,9 +1,16 @@
 {
   "expo": {
+<<<<<<< HEAD
     "name": "petgo",
     "slug": "petgo",
     "owner": "realsung6",
     "scheme": "petgo",
+=======
+    "owner": "realsung6",
+    "name": "petgo-driver",
+    "slug": "petgo-driver",
+    "scheme": "pet-transport",
+>>>>>>> 84c5a5c (feat: Configure app as petgo-driver, update authenticated navigation, and enhance chat message deduplication logic.)
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,7 +26,11 @@
       "config": {
         "googleMapsApiKey": "AIzaSyDKQzAl_-qFOsxqp4Wq2aobo41GyGjtEw0"
       },
+<<<<<<< HEAD
       "bundleIdentifier": "com.petgo.petgo",
+=======
+      "bundleIdentifier": "com.anonymous.petgodriver",
+>>>>>>> 84c5a5c (feat: Configure app as petgo-driver, update authenticated navigation, and enhance chat message deduplication logic.)
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -36,7 +47,11 @@
           "apiKey": "AIzaSyDKQzAl_-qFOsxqp4Wq2aobo41GyGjtEw0"
         }
       },
+<<<<<<< HEAD
       "package": "com.petgo.petgo",
+=======
+      "package": "com.anonymous.petgodriver",
+>>>>>>> 84c5a5c (feat: Configure app as petgo-driver, update authenticated navigation, and enhance chat message deduplication logic.)
       "usesCleartextTraffic": true
     },
     "web": {
@@ -55,7 +70,11 @@
     "extra": {
       "router": {},
       "eas": {
+<<<<<<< HEAD
         "projectId": "fe18173f-c822-4d80-9c28-c1132877d6e7"
+=======
+        "projectId": "f90d9479-ee45-40af-857b-8b10d8d11589"
+>>>>>>> 84c5a5c (feat: Configure app as petgo-driver, update authenticated navigation, and enhance chat message deduplication logic.)
       }
     }
   }
