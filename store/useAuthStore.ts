@@ -15,7 +15,6 @@ interface AuthState {
     register: (fullName: string, phone: string, email: string, password: string) => Promise<void>;
     loadUser: () => Promise<void>;
     logout: () => Promise<void>;
-    setUser: (user: User | null) => void;
     clearError: () => void;
 }
 
@@ -32,8 +31,8 @@ export const useAuthStore = create<AuthState>((set) => ({
             const response = await authService.login(username, password);
             set({
                 isAuthenticated: true,
-                role: response.role as UserRole,
-                user: (response.driver || response.user) as User,
+                role: response.user.role,
+                user: response.user,
                 isLoading: false,
             });
         } catch (error: any) {
@@ -51,8 +50,8 @@ export const useAuthStore = create<AuthState>((set) => ({
             const response = await authService.verifyOTP(phoneNumber, otp);
             set({
                 isAuthenticated: true,
-                role: response.role as UserRole,
-                user: (response.driver || response.user) as User,
+                role: response.user.role,
+                user: response.user,
                 isLoading: false,
             });
         } catch (error: any) {
@@ -75,8 +74,8 @@ export const useAuthStore = create<AuthState>((set) => ({
             });
             set({
                 isAuthenticated: true,
-                role: response.role as UserRole,
-                user: (response.driver || response.user) as User,
+                role: response.user.role,
+                user: response.user,
                 isLoading: false,
             });
         } catch (error: any) {
@@ -118,8 +117,6 @@ export const useAuthStore = create<AuthState>((set) => ({
             error: null,
         });
     },
-
-    setUser: (user: User | null) => set({ user }),
 
     clearError: () => set({ error: null }),
 }));

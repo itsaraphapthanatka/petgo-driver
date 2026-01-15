@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MapPin, Clock, CheckCircle, XCircle, Car, User } from 'lucide-react-native';
+import { MapPin, Clock, CheckCircle, XCircle, Car } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { orderService } from '../../../services/orderService';
 import { Order } from '../../../types/order';
 import { formatCurrency, formatPrice } from '../../../utils/format';
 
-export default function DriverHistoryScreen() {
+export default function CustomerHistoryScreen() {
     const [activeTab, setActiveTab] = useState<'completed' | 'cancelled'>('completed');
     const [completedOrders, setCompletedOrders] = useState<Order[]>([]);
     const [cancelledOrders, setCancelledOrders] = useState<Order[]>([]);
@@ -53,7 +53,7 @@ export default function DriverHistoryScreen() {
         <TouchableOpacity
             key={order.id}
             className="bg-white p-4 rounded-xl mb-3 border border-gray-100 shadow-sm"
-            onPress={() => router.push(`/(driver)/job/${order.id}`)}
+            onPress={() => router.push(`/(customer)/payment-summary/${order.id}`)}
         >
             <View className="flex-row justify-between items-start mb-3">
                 <View className="flex-1">
@@ -92,23 +92,23 @@ export default function DriverHistoryScreen() {
 
             <View className="pt-3 border-t border-gray-50 flex-row justify-between items-center">
                 <View className="flex-row items-center">
-                    {order.customer ? (
+                    {order.driver ? (
                         <>
-                            <View className="w-8 h-8 bg-blue-100 rounded-full items-center justify-center mr-2">
-                                <User size={16} color="#3B82F6" />
+                            <View className="w-8 h-8 bg-gray-100 rounded-full items-center justify-center mr-2">
+                                <Car size={16} color="#6B7280" />
                             </View>
                             <View>
-                                <Text className="text-xs text-gray-500">ลูกค้า</Text>
-                                <Text className="text-sm font-bold text-gray-800">{order.customer?.full_name || 'ลูกค้าพาร์ทเนอร์'}</Text>
+                                <Text className="text-xs text-gray-500">คนขับ</Text>
+                                <Text className="text-sm font-bold text-gray-800">{order.driver.user?.full_name || 'คนขับพาร์ทเนอร์'}</Text>
                             </View>
                         </>
                     ) : (
-                        <Text className="text-xs text-gray-400 italic">ไม่ได้ระบุลูกค้า</Text>
+                        <Text className="text-xs text-gray-400 italic">ไม่ได้ระบุคนขับ</Text>
                     )}
                 </View>
                 <View className="items-end">
-                    <Text className="text-xs text-gray-500">รายได้ของคุณ</Text>
-                    <Text className="text-lg font-bold text-green-600">฿{formatPrice((order.price || 0) * 0.8)}</Text>
+                    <Text className="text-xs text-gray-500">ราคาสุทธิ</Text>
+                    <Text className="text-lg font-bold text-gray-900">฿{formatPrice(order.price)}</Text>
                 </View>
             </View>
         </TouchableOpacity>

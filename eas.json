@@ -10,13 +10,7 @@
     },
     "preview": {
       "distribution": "internal",
-<<<<<<< HEAD
       "environment": "preview",
-=======
-      "android": {
-        "buildType": "apk"
-      },
->>>>>>> 84c5a5c (feat: Configure app as petgo-driver, update authenticated navigation, and enhance chat message deduplication logic.)
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://api.petgo.asia",
         "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51Skz20PSi9LrUNAQdwDnuRyRmiuxUAkgatNqko2m8itJPN2hPY3eN5apqYSXL350a3gnKk2zNx6tLuSe6PF1YCVZ00ETBzIWi4",
@@ -26,7 +20,6 @@
       }
     },
     "production": {
-      "distribution": "internal",
       "android": {
         "buildType": "apk"
       },

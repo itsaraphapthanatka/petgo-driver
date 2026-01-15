@@ -5,11 +5,6 @@ export interface User {
     phone: string;
     email: string | null;
     role: 'customer' | 'driver' | 'admin';
-    wallet_balance?: number;
-    bank_name?: string;
-    bank_account_number?: string;
-    bank_account_name?: string;
-    work_radius_km?: number;
 }
 
 export interface LoginRequest {
@@ -36,9 +31,7 @@ export interface OTPVerifyRequest {
 export interface AuthResponse {
     access_token: string;
     token_type: string;
-    user?: User;
-    driver?: User;
-    role: string;
+    user: User;
 }
 
 export interface OTPResponse {

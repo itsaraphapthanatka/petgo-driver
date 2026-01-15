@@ -20,21 +20,6 @@ export default function DriverHomeScreen() {
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const lastSentLocationRef = React.useRef<{ lat: number; lng: number } | null>(null);
 
-    // Check for active job on mount
-    useEffect(() => {
-        (async () => {
-            try {
-                const activeJob = await api.getActiveOrder();
-                if (activeJob) {
-                    console.log(`[Home] Active job found: ${activeJob.id}. Redirecting...`);
-                    router.push(`/(driver)/job/${activeJob.id}`);
-                }
-            } catch (err) {
-                console.error("Failed to check for active job:", err);
-            }
-        })();
-    }, []);
-
     const handleToggleOnline = async (value: boolean) => {
         if (isUpdatingStatus) return;
 
@@ -154,26 +139,8 @@ export default function DriverHomeScreen() {
         try {
             await acceptJob(job.id);
             router.push(`/(driver)/job/${job.id}`);
-        } catch (error: any) {
+        } catch (error) {
             console.error('Failed to accept job:', error);
-            const errorMessage = error.message || '';
-
-            // Check for 403 or specific error message from backend
-            if (errorMessage.includes('403') || errorMessage.includes('ยอดเงินในกระเป๋าติดลบเกิน 500 บาท') || errorMessage.includes('Insufficient wallet balance')) {
-                Alert.alert(
-                    "ยอดเงินไม่เพียงพอ",
-                    "ยอดเงินในกระเป๋าของคุณติดลบเกิน 500 บาท กรุณาเติมเงินเข้าระบบเพื่อรับงานต่อ",
-                    [
-                        { text: "ยกเลิก", style: "cancel" },
-                        {
-                            text: "ไปหน้ากระเป๋าเงิน",
-                            onPress: () => router.push('/(driver)/wallet')
-                        }
-                    ]
-                );
-            } else {
-                Alert.alert("ไม่สามารถรับงานได้", "เกิดข้อผิดพลาดในการรับงาน กรุณาลองใหม่อีกครั้ง");
-            }
         } finally {
             setAcceptingJobId(null);
         }
@@ -315,7 +282,7 @@ export default function DriverHomeScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-gray-50" edges={['top', 'left', 'right']}>
+        <SafeAreaView className="flex-1 bg-gray-50">
             {/* Header Status */}
             <View className="bg-white p-5 shadow-sm flex-row justify-between items-center mb-4">
                 <View>

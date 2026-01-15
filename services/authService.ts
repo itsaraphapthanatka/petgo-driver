@@ -61,7 +61,7 @@ export const authService = {
             formData.append('username', username);
             formData.append('password', password);
 
-            const response = await fetch(`${API_BASE_URL}/auth/driver/login`, {
+            const response = await fetch(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -153,11 +153,7 @@ export const authService = {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    phone_number: phoneNumber,
-                    otp,
-                    role: 'driver'
-                }),
+                body: JSON.stringify({ phone_number: phoneNumber, otp }),
             });
 
             if (!response.ok) {

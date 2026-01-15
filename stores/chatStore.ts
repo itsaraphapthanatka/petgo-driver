@@ -48,10 +48,7 @@ export const useChatStore = create<ChatState>((set) => ({
                 // If the new message has more info (like an ID), update the existing one
                 if (msg.id && !state.messages[existingIndex].id) {
                     const newMessages = [...state.messages];
-                    newMessages[existingIndex] = {
-                        ...state.messages[existingIndex],
-                        ...msg
-                    };
+                    newMessages[existingIndex] = msg;
                     return { messages: newMessages };
                 }
                 // Otherwise, it's a true duplicate, ignore it

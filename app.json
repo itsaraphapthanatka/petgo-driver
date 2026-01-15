@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "petgo-driver",
-    "slug": "petgo-driver",
+    "name": "petgo",
+    "slug": "petgo",
     "owner": "realsung6",
-    "scheme": "pet-transport",
+    "scheme": "petgo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,7 +19,7 @@
       "config": {
         "googleMapsApiKey": "AIzaSyDKQzAl_-qFOsxqp4Wq2aobo41GyGjtEw0"
       },
-      "bundleIdentifier": "com.anonymous.petgodriver",
+      "bundleIdentifier": "com.petgo.petgo",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -36,7 +36,7 @@
           "apiKey": "AIzaSyDKQzAl_-qFOsxqp4Wq2aobo41GyGjtEw0"
         }
       },
-      "package": "com.anonymous.petgodriver",
+      "package": "com.petgo.petgo",
       "usesCleartextTraffic": true
     },
     "web": {
@@ -55,7 +55,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f90d9479-ee45-40af-857b-8b10d8d11589"
+        "projectId": "fe18173f-c822-4d80-9c28-c1132877d6e7"
       }
     }
   }

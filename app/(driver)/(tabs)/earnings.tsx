@@ -6,15 +6,6 @@ import { router } from 'expo-router';
 import { api } from '../../../services/api';
 import { formatCurrency } from '../../../utils/format';
 
-interface OrderItem {
-    id: number;
-    created_at: string;
-    pickup_address: string;
-    dropoff_address: string;
-    price: number;
-    driver_earnings: number;
-}
-
 interface EarningsSummary {
     period: string;
     start_date: string;
@@ -23,7 +14,6 @@ interface EarningsSummary {
     total_price: number;
     total_platform_fee: number;
     total_driver_earnings: number;
-    orders: OrderItem[];
 }
 
 export default function DriverEarningsScreen() {
@@ -53,22 +43,8 @@ export default function DriverEarningsScreen() {
         return '30 วันล่าสุด';
     };
 
-    const formatDate = (dateString: string) => {
-        try {
-            const date = new Date(dateString);
-            return date.toLocaleDateString('th-TH', {
-                day: 'numeric',
-                month: 'short',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        } catch (e) {
-            return dateString;
-        }
-    };
-
     return (
-        <SafeAreaView className="flex-1 bg-gray-50" edges={['top', 'left', 'right']}>
+        <SafeAreaView className="flex-1 bg-gray-50">
             {/* Header */}
             <View className="bg-white px-5 py-4 flex-row items-center border-b border-gray-100">
                 <TouchableOpacity onPress={() => router.back()} className="mr-3">
@@ -120,50 +96,46 @@ export default function DriverEarningsScreen() {
                     </Text>
 
                     {/* Total Orders Card */}
-                    <View className="bg-white rounded-xl shadow-sm p-5 mb-4 border border-gray-100">
-                        <View className="flex-row items-center">
-                            <View className="bg-blue-100 p-3 rounded-full mr-4">
+                    <View className="bg-white rounded-xl shadow-sm p-5 mb-4">
+                        <View className="flex-row items-center mb-2">
+                            <View className="bg-blue-100 p-2 rounded-full mr-3">
                                 <Car size={24} color="#3B82F6" />
                             </View>
                             <View className="flex-1">
-                                <Text className="text-gray-500 text-xs uppercase font-bold tracking-wider mb-1">จำนวนงาน</Text>
-                                <View className="flex-row items-baseline">
-                                    <Text className="text-3xl font-bold text-gray-800">
-                                        {earnings.total_orders}
-                                    </Text>
-                                    <Text className="text-gray-500 ml-2 font-medium">งานเสร็จสิ้น</Text>
-                                </View>
+                                <Text className="text-gray-600 text-sm">จำนวนงาน</Text>
+                                <Text className="text-3xl font-bold text-gray-800">
+                                    {earnings.total_orders}
+                                </Text>
+                                <Text className="text-xs text-gray-500">งานที่เสร็จสิ้น</Text>
                             </View>
                         </View>
                     </View>
 
                     {/* Earnings Breakdown Card */}
-                    <View className="bg-white rounded-xl shadow-sm p-5 mb-6 border border-gray-100">
-                        <View className="flex-row items-center mb-5">
-                            <View className="bg-green-100 p-3 rounded-full mr-4">
+                    <View className="bg-white rounded-xl shadow-sm p-5 mb-4">
+                        <View className="flex-row items-center mb-4">
+                            <View className="bg-green-100 p-2 rounded-full mr-3">
                                 <DollarSign size={24} color="#00A862" />
                             </View>
-                            <Text className="text-lg font-bold text-gray-800">รายได้ของคุณ</Text>
+                            <Text className="text-lg font-bold text-gray-800">รายละเอียดรายได้</Text>
                         </View>
 
-                        <View className="space-y-4">
-                            <View className="flex-row justify-between items-center">
-                                <Text className="text-gray-500">ราคารวมลูกค้าจ่าย</Text>
+                        <View className="space-y-3">
+                            <View className="flex-row justify-between items-center pb-3 border-b border-gray-100">
+                                <Text className="text-gray-600">ราคารวมทั้งหมด</Text>
                                 <Text className="text-lg font-semibold text-gray-800">
                                     ฿{formatCurrency(earnings.total_price, 2)}
                                 </Text>
                             </View>
 
-                            <View className="flex-row justify-between items-center">
-                                <Text className="text-gray-500">ค่าธรรมเนียมแพลตฟอร์ม</Text>
-                                <Text className="text-lg font-semibold text-red-500">
+                            <View className="flex-row justify-between items-center pb-3 border-b border-gray-100">
+                                <Text className="text-gray-600">ค่าบริการแอพ</Text>
+                                <Text className="text-lg font-semibold text-red-600">
                                     -฿{formatCurrency(earnings.total_platform_fee, 2)}
                                 </Text>
                             </View>
 
-                            <View className="h-[1px] bg-gray-100 my-2" />
-
-                            <View className="flex-row justify-between items-center">
+                            <View className="flex-row justify-between items-center pt-2">
                                 <Text className="text-lg font-bold text-gray-800">รายได้สุทธิ</Text>
                                 <Text className="text-2xl font-bold text-green-600">
                                     ฿{formatCurrency(earnings.total_driver_earnings, 2)}
@@ -172,42 +144,26 @@ export default function DriverEarningsScreen() {
                         </View>
                     </View>
 
-                    {/* Itemized Orders Breakdown */}
-                    <View className="mb-10">
-                        <Text className="text-lg font-bold text-gray-800 mb-4 ml-1">รายละเอียดงาน</Text>
-
-                        {earnings.orders && earnings.orders.length > 0 ? (
-                            earnings.orders.map((order) => (
-                                <View key={order.id} className="bg-white p-4 rounded-xl mb-3 border border-gray-100 shadow-sm">
-                                    <View className="flex-row justify-between items-start mb-2">
-                                        <View className="flex-1 mr-2">
-                                            <Text className="text-xs text-gray-400 font-medium mb-1">
-                                                {formatDate(order.created_at)}
-                                            </Text>
-                                            <Text className="text-gray-700 font-medium" numberOfLines={1}>
-                                                {order.pickup_address}
-                                            </Text>
-                                            <Text className="text-gray-400 text-xs" numberOfLines={1}>
-                                                → {order.dropoff_address}
-                                            </Text>
-                                        </View>
-                                        <View className="items-end">
-                                            <Text className="text-green-600 font-bold text-lg">
-                                                +฿{formatCurrency(order.driver_earnings, 2)}
-                                            </Text>
-                                            <Text className="text-gray-400 text-[10px]">
-                                                (จาก ฿{formatCurrency(order.price, 0)})
-                                            </Text>
-                                        </View>
-                                    </View>
+                    {/* Average Per Order */}
+                    {earnings.total_orders > 0 && (
+                        <View className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-5 mb-10">
+                            <Text className="text-gray-700 font-bold mb-2">เฉลี่ยต่องาน</Text>
+                            <View className="flex-row justify-between">
+                                <View>
+                                    <Text className="text-xs text-gray-600">ราคารวม</Text>
+                                    <Text className="text-lg font-bold text-gray-800">
+                                        ฿{formatCurrency(earnings.total_price / earnings.total_orders, 2)}
+                                    </Text>
                                 </View>
-                            ))
-                        ) : (
-                            <View className="bg-white p-8 rounded-xl items-center border border-dashed border-gray-300">
-                                <Text className="text-gray-400">ยังไม่มีประวัติงานในช่วงนี้</Text>
+                                <View>
+                                    <Text className="text-xs text-gray-600 text-right">รายได้สุทธิ</Text>
+                                    <Text className="text-lg font-bold text-green-600 text-right">
+                                        ฿{formatCurrency(earnings.total_driver_earnings / earnings.total_orders, 2)}
+                                    </Text>
+                                </View>
                             </View>
-                        )}
-                    </View>
+                        </View>
+                    )}
                 </ScrollView>
             ) : (
                 <View className="flex-1 items-center justify-center p-10">

@@ -467,7 +467,6 @@ export const api = {
         if (!response.ok) throw new Error('Failed to detach payment method');
         return response.json();
     },
-
     chargeSavedCard: async (orderId: number, paymentMethodId: string): Promise<any> => {
         const headers = await getAuthHeaders();
         const response = await fetch(`${API_BASE_URL}/payments/charge-card?order_id=${orderId}&payment_method_id=${paymentMethodId}`, {
@@ -479,52 +478,5 @@ export const api = {
             throw new Error(`Charge failed: ${errorText}`);
         }
         return response.json();
-    },
-
-    updateDriverBank: async (bankData: { bank_name: string, bank_account_number: string, bank_account_name: string }): Promise<any> => {
-        const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/drivers/bank-account`, {
-            method: 'PUT',
-            headers,
-            body: JSON.stringify(bankData)
-        });
-        if (!response.ok) throw new Error('Failed to update bank account');
-        return response.json();
-    },
-
-    requestWithdrawal: async (amount: number): Promise<any> => {
-        const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/wallet/withdraw`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ amount })
-        });
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Failed to request withdrawal');
-        }
-        return response.json();
-    },
-
-    getActiveOrder: async (): Promise<any | null> => {
-        try {
-            const headers = await getAuthHeaders();
-            const response = await fetch(`${API_BASE_URL}/orders/`, { headers });
-
-            if (!response.ok) {
-                console.error('Failed to fetch orders for active check');
-                return null;
-            }
-
-            const orders = await response.json();
-            const activeStatuses = ['accepted', 'arrived', 'picked_up', 'in_progress'];
-
-            // Find any order that is currently active for this driver
-            const activeOrder = orders.find((o: any) => activeStatuses.includes(o.status));
-            return activeOrder || null;
-        } catch (error) {
-            console.error('Error fetching active order:', error);
-            return null;
-        }
     }
 };

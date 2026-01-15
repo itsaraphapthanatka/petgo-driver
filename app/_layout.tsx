@@ -55,7 +55,7 @@ function RootLayout() {
         const inAuthGroup = segments[0] === '(auth)';
 
         if (isAuthenticated && inAuthGroup) {
-            router.replace('/(driver)/(tabs)/home');
+            router.replace('/(customer)/(tabs)/home');
         } else if (!isAuthenticated && !inAuthGroup) {
             // Redirect to login if token expired (mock)
             setTimeout(() => {

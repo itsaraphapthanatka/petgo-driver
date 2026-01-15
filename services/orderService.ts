@@ -221,36 +221,13 @@ export const orderService = {
         return response.json();
     },
 
-    confirmPayment: async (orderId: number): Promise<Order> => {
-        const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
-            method: 'PATCH',
-            headers,
-            body: JSON.stringify({ payment_status: 'paid' }),
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to confirm payment: ${response.status} - ${errorText}`);
-        }
-
-        return await response.json();
-    },
-
-    getActiveOrder: async (): Promise<Order | null> => {
+    getActiveOrder: async (userId: number): Promise<Order | null> => {
         try {
-            const headers = await getAuthHeaders();
-            const response = await fetch(`${API_BASE_URL}/orders/`, { headers });
-
-            if (!response.ok) {
-                console.error('Failed to fetch orders for active check');
-                return null;
-            }
-
-            const orders: Order[] = await response.json();
-            const activeStatuses = ['accepted', 'arrived', 'picked_up', 'in_progress'];
-
-            // Find any order that is currently active for this driver
+            // Fetch all orders for the user
+            const orders = await orderService.getOrders();
+            // Filter for active status
+            const activeStatuses = ['pending', 'accepted', 'arrived', 'picked_up', 'in_progress'];
+            // Find the most recent active order (assuming API returns sorted or we just take first found)
             const activeOrder = orders.find(o => activeStatuses.includes(o.status));
             return activeOrder || null;
         } catch (error) {
