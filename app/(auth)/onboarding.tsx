@@ -16,20 +16,20 @@ export default function OnboardingScreen() {
     const SLIDES = [
         {
             id: 1,
-            title: t('onboarding.slide1_title'),
-            subtitle: t('onboarding.slide1_subtitle'),
+            title: t('onboarding.driver_slide1_title'),
+            subtitle: t('onboarding.driver_slide1_subtitle'),
             color: "bg-green-50"
         },
         {
             id: 2,
-            title: t('onboarding.slide2_title'),
-            subtitle: t('onboarding.slide2_subtitle'),
+            title: t('onboarding.driver_slide2_title'),
+            subtitle: t('onboarding.driver_slide2_subtitle'),
             color: "bg-blue-50"
         },
         {
             id: 3,
-            title: t('onboarding.slide3_title'),
-            subtitle: t('onboarding.slide3_subtitle'),
+            title: t('onboarding.driver_slide3_title'),
+            subtitle: t('onboarding.driver_slide3_subtitle'),
             color: "bg-purple-50"
         }
     ];

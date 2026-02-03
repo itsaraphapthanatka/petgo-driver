@@ -49,7 +49,13 @@ const resources = {
                 slide3_subtitle: "From hamsters to Great Danes, we have the right vehicle for you.",
                 skip: "Skip",
                 next: "Next",
-                get_started: "Get Started"
+                get_started: "Get Started",
+                driver_slide1_title: "Earn with Every Ride",
+                driver_slide1_subtitle: "Help pet owners transport their loved ones safely and earn competitive rates.",
+                driver_slide2_title: "Flexible Schedule",
+                driver_slide2_subtitle: "Accept jobs whenever you're online. You're in control of your time.",
+                driver_slide3_title: "Easy Job Management",
+                driver_slide3_subtitle: "Manage pickups, stops, and payments all in one place."
             },
 
             // Login
@@ -208,7 +214,13 @@ const resources = {
                 slide3_subtitle: "จากแฮมสเตอร์ส์ถึง Great Danes, เรามีรถที่เหมาะสมสำหรับคุณ",
                 skip: "ข้าม",
                 next: "ต่อไป",
-                get_started: "เริ่มต้น"
+                get_started: "เริ่มต้น",
+                driver_slide1_title: "สร้างรายได้จากการขนส่ง",
+                driver_slide1_subtitle: "ช่วยเจ้าของสัตว์เลี้ยงพาสัตว์เลี้ยงไปทุกที่อย่างปลอดภัย และรับรายได้ที่คุ้มค่า",
+                driver_slide2_title: "กำหนดเวลาได้เอง",
+                driver_slide2_subtitle: "รับงานได้ทุกเมื่อที่คุณต้องการ คุณคือผู้ควบคุมเวลาของตัวเอง",
+                driver_slide3_title: "จัดการงานง่ายขึ้น",
+                driver_slide3_subtitle: "จัดการทั้งจุดรับ จุดพัก และการรับชำระเงินได้ครบในที่เดียว"
             },
 
             // Login

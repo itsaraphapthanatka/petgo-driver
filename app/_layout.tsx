@@ -58,10 +58,18 @@ function RootLayout() {
         if (isAuthenticated && inAuthGroup) {
             const { registerForPushNotificationsAsync } = require('../services/notificationService');
             registerForPushNotificationsAsync();
+
             if (role === 'driver') {
                 router.replace('/(driver)/(tabs)/home');
             } else {
-                router.replace('/(customer)/(tabs)/home');
+                // Not a driver, show error and logout
+                const { logout } = useAuthStore.getState();
+                logout();
+                const { t } = require('react-i18next').useTranslation();
+                require('react-native').Alert.alert(
+                    "Access Denied",
+                    "This application is for drivers only. Please use the customer app or contact support."
+                );
             }
         } else if (!isAuthenticated && !inAuthGroup) {
             // Redirect to login if token expired (mock)
