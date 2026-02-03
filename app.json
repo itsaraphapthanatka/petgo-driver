@@ -40,7 +40,7 @@
           "apiKey": "AIzaSyDnGZEQN5YUH1LFOTw1UzriihB_VbqzlAQ"
         }
       },
-      "package": "com.anonymous.petgodriver",
+      "package": "com.anonymous.petgo.driver",
       "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true
     },
