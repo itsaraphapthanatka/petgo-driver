@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, TextInput, Platform, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, TextInput, Platform, StyleSheet, ActivityIndicator, Linking } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView from 'react-native-maps';
+import { AppMapView } from '../../../components/AppMapView';
 import MapViewDirections from 'react-native-maps-directions';
 import { PetGoCarIcon } from '../../../components/icons/PetGoCarIcon';
 import { useTranslation } from 'react-i18next';
@@ -48,7 +50,7 @@ export default function ConfirmBookingScreen() {
     const mapRef = useRef<MapView>(null);
     const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
     const [note, setNote] = useState('');
-    const { pickupLocation, dropoffLocation, clearBooking } = useBookingStore();
+    const { pickupLocation, dropoffLocation, stops, clearBooking } = useBookingStore();
     const [distance, setDistance] = useState(0);
     // Force HERE Maps on confirm page
     const mapProvider: string = 'here';
@@ -66,6 +68,7 @@ export default function ConfirmBookingScreen() {
     const [walletBalance, setWalletBalance] = useState(0);
     const [savedCards, setSavedCards] = useState<any[]>([]);
     const [isLoadingCards, setIsLoadingCards] = useState(false);
+    const [paymentConfig, setPaymentConfig] = useState<{ cash: boolean; promptpay: boolean; wallet: boolean; stripe: boolean }>({ cash: true, promptpay: true, wallet: true, stripe: true });
 
     // Booking State
     const [bookingStatus, setBookingStatus] = useState<'idle' | 'searching' | 'confirmed'>('idle');
@@ -83,6 +86,23 @@ export default function ConfirmBookingScreen() {
     const shareLocationIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const prevStatusRef = useRef<Order['status'] | null>(null);
     const { user } = useAuthStore();
+
+    // Fetch payment config on mount
+    useEffect(() => {
+        const fetchPaymentConfig = async () => {
+            try {
+                const config = await api.getPaymentConfig();
+                setPaymentConfig(config);
+                // Set default payment method to first enabled option
+                if (!config.cash && config.promptpay) setPaymentMethod('promptpay');
+                else if (!config.cash && !config.promptpay && config.wallet) setPaymentMethod('wallet');
+                else if (!config.cash && !config.promptpay && !config.wallet && config.stripe) setPaymentMethod('stripe');
+            } catch (error) {
+                console.error('Failed to fetch payment config:', error);
+            }
+        };
+        fetchPaymentConfig();
+    }, []);
 
     // Effect for Hydrating Existing Order
     useEffect(() => {
@@ -133,8 +153,9 @@ export default function ConfirmBookingScreen() {
 
     // Animation for Bottom Sheet
     const SCREEN_HEIGHT = Dimensions.get('window').height;
-    const SNAP_TOP = SCREEN_HEIGHT * 0.45;
-    const SNAP_BOTTOM = SCREEN_HEIGHT - 120;
+    const SNAP_MAX = SCREEN_HEIGHT * 0.15; // 85% height
+    const SNAP_TOP = SCREEN_HEIGHT * 0.40; // 60% height (Initial view)
+    const SNAP_BOTTOM = SCREEN_HEIGHT - 180; // Collapsed (leave 180px visible)
     const SNAP_DRIVER = SCREEN_HEIGHT - 320; // Height for Driver Found card (approx 320px)
 
     const panY = useRef(new Animated.Value(SNAP_TOP)).current;
@@ -165,31 +186,40 @@ export default function ConfirmBookingScreen() {
             onPanResponderRelease: (_, gestureState) => {
                 panY.flattenOffset();
 
+                const currentY = (panY as any)._value; // Access internal value for calculation
+                const targetBottom = bookingStatus === 'confirmed' ? SNAP_DRIVER : SNAP_BOTTOM;
+
+                // Possible snap points when idle
+                const snapPoints = bookingStatus === 'confirmed'
+                    ? [SNAP_DRIVER, SNAP_TOP] // When confirmed, maybe just driver and mid? 
+                    : [SNAP_MAX, SNAP_TOP, SNAP_BOTTOM];
+
                 // Determine direction and velocity to snap
-                if (gestureState.dy > 50 || (gestureState.dy > 0 && gestureState.vy > 0.5)) {
-                    // Slide Down
-                    Animated.spring(panY, {
-                        toValue: bookingStatus === 'confirmed' ? SNAP_DRIVER : SNAP_BOTTOM, // Snap to appropriate bottom
-                        useNativeDriver: false,
-                        tension: 50,
-                        friction: 10
-                    }).start();
-                } else if (gestureState.dy < -50 || (gestureState.dy < 0 && gestureState.vy < -0.5)) {
-                    // Slide Up
-                    Animated.spring(panY, {
-                        toValue: SNAP_TOP,
-                        useNativeDriver: false,
-                        tension: 50,
-                        friction: 10
-                    }).start();
+                if (Math.abs(gestureState.vy) > 0.5) {
+                    // Velocity-based snapping
+                    if (gestureState.vy > 0) {
+                        // Moving Down
+                        const destination = currentY < SNAP_TOP ? SNAP_TOP : targetBottom;
+                        Animated.spring(panY, { toValue: destination, useNativeDriver: false }).start();
+                    } else {
+                        // Moving Up
+                        const destination = currentY > SNAP_TOP ? SNAP_TOP : SNAP_MAX;
+                        Animated.spring(panY, { toValue: destination, useNativeDriver: false }).start();
+                    }
                 } else {
-                    // Return to nearest
-                    // Simple toggle logic based on direction for robustness
-                    const targetBottom = bookingStatus === 'confirmed' ? SNAP_DRIVER : SNAP_BOTTOM;
-                    Animated.spring(panY, {
-                        toValue: gestureState.dy > 0 ? targetBottom : SNAP_TOP,
-                        useNativeDriver: false
-                    }).start();
+                    // Position-based snapping (snap to nearest)
+                    let closest = snapPoints[0];
+                    let minDiff = Math.abs(currentY - snapPoints[0]);
+
+                    for (let i = 1; i < snapPoints.length; i++) {
+                        const diff = Math.abs(currentY - snapPoints[i]);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            closest = snapPoints[i];
+                        }
+                    }
+
+                    Animated.spring(panY, { toValue: closest, useNativeDriver: false }).start();
                 }
             }
         })
@@ -275,7 +305,7 @@ export default function ConfirmBookingScreen() {
                     return {
                         id: v.key,
                         name: v.name,
-                        image: mock?.image || 'car', // Fallback
+                        image: v.image_url || mock?.image || 'car', // Fallback
                         description: mock?.description || '',
                         basePrice: v.rates.base,
                         perKmRate: v.rates.per_km,
@@ -321,6 +351,7 @@ export default function ConfirmBookingScreen() {
                     pickup_lng: pickupLocation.longitude,
                     dropoff_lat: dropoffLocation.latitude,
                     dropoff_lng: dropoffLocation.longitude,
+                    stops: stops.map(s => ({ lat: s.latitude, lng: s.longitude })),
                     pet_weight_kg: petWeight,
                     vehicle_type: selectedVehicle.id,
                     provider: mapProvider
@@ -356,7 +387,7 @@ export default function ConfirmBookingScreen() {
         };
 
         fetchPrice();
-    }, [pickupLocation, dropoffLocation, selectedVehicle, distance, mapProvider, petWeight]);
+    }, [pickupLocation, dropoffLocation, stops, selectedVehicle, distance, mapProvider, petWeight]);
 
     // Calculate Route Origin/Dest based on status
     const routeOrigin = (bookingStatus === 'confirmed' && assignedDriver)
@@ -383,6 +414,7 @@ export default function ConfirmBookingScreen() {
                 const routes = await hereMapApi.getRoutes(
                     routeOrigin,
                     routeDestination,
+                    bookingStatus === 'idle' ? stops.map(s => ({ latitude: s.latitude, longitude: s.longitude })) : [],
                     mode as any,
                     HERE_MAPS_API_KEY
                 );
@@ -398,7 +430,8 @@ export default function ConfirmBookingScreen() {
                         setDriverDuration(routes[0].duration / 60);
                     }
 
-                    if (mapRef.current) {
+                    const isFollowing = currentOrder?.status === 'in_progress' || currentOrder?.status === 'picked_up';
+                    if (mapRef.current && !isFollowing) {
                         mapRef.current.fitToCoordinates(routes[0].coordinates, {
                             edgePadding: { top: 50, right: 50, bottom: 350, left: 50 },
                             animated: true,
@@ -411,7 +444,7 @@ export default function ConfirmBookingScreen() {
         };
 
         fetchRoutes();
-    }, [bookingStatus, assignedDriver, pickupLocation, dropoffLocation, mapProvider, selectedVehicle]);
+    }, [bookingStatus, assignedDriver, pickupLocation, dropoffLocation, mapProvider, selectedVehicle, currentOrder?.status]);
 
     const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
         const R = 6371; // Radius of the earth in km
@@ -468,7 +501,13 @@ export default function ConfirmBookingScreen() {
                 stripe_payment_method_id: paymentMethod === 'stripe' ? savedCards[0]?.id : undefined,
                 passengers: passengers,
                 pet_ids: petIds.map(Number), // Send all pet IDs
-                pet_details: displayPetNames
+                pet_details: displayPetNames,
+                stops: stops.map((s, i) => ({
+                    address: s.address || s.name || 'Stop',
+                    lat: s.latitude,
+                    lng: s.longitude,
+                    order_index: i
+                }))
             });
 
             // Create initial payment record
@@ -512,9 +551,9 @@ export default function ConfirmBookingScreen() {
                     // 1. Detect Status Change for Notifications
                     if (prevStatusRef.current && prevStatusRef.current !== updatedOrder.status) {
                         if (updatedOrder.status === 'arrived') {
-                            Alert.alert("Driver Arrived!", "Your driver has arrived at the pickup location. Please meet them at the pickup point.", [
-                                { text: "OK", onPress: () => startSharingLocation(order.id) }
-                            ]);
+                            Alert.alert("Driver Arrived!", "Your driver has arrived at the pickup location. Please meet them at the pickup point.");
+                        } else if (updatedOrder.status === 'accepted') {
+                            startSharingLocation(order.id);
                         } else if (updatedOrder.status === 'in_progress') {
                             stopSharingLocation();
                             Alert.alert("Journey Started", "The journey has begun. Your pet is safely on the way!");
@@ -530,19 +569,13 @@ export default function ConfirmBookingScreen() {
                                 clearBooking();
                                 router.replace(`/(customer)/payment/${order.id}`);
                             } else {
-                                Alert.alert("Journey Completed", "You have arrived at your destination. Thank you for using our service!", [
-                                    {
-                                        text: "OK",
-                                        onPress: () => {
-                                            stopSharingLocation();
-                                            setBookingStatus('idle');
-                                            setCurrentOrder(null);
-                                            setAssignedDriver(null);
-                                            clearBooking();
-                                            router.replace(`/(customer)/payment-summary/${order.id}`);
-                                        }
-                                    }
-                                ]);
+                                // Auto redirect without alert
+                                stopSharingLocation();
+                                setBookingStatus('idle');
+                                setCurrentOrder(null);
+                                setAssignedDriver(null);
+                                clearBooking();
+                                router.replace(`/(customer)/payment-summary/${order.id}`);
                             }
                         } else if (updatedOrder.status === 'cancelled') {
                             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
@@ -572,8 +605,9 @@ export default function ConfirmBookingScreen() {
                         if (driverLoc) {
                             setAssignedDriver(driverLoc);
 
-                            // 2.a Handle Navigation/Follow Mode (Always if in_progress)
-                            if (updatedOrder.status === 'in_progress' && mapRef.current) {
+                            // 2.a Handle Navigation/Follow Mode (Always if driver assigned and job active)
+                            const isActive = ['accepted', 'arrived', 'picked_up', 'in_progress'].includes(updatedOrder.status);
+                            if (isActive && mapRef.current) {
                                 mapRef.current.animateCamera({
                                     center: {
                                         latitude: driverLoc.lat,
@@ -700,7 +734,7 @@ export default function ConfirmBookingScreen() {
         <View className="flex-1 bg-white">
             {/* Full Screen Map */}
             <View className="absolute top-0 left-0 right-0 bottom-0 bg-gray-200">
-                <MapView
+                <AppMapView
                     ref={mapRef}
 
                     provider={PROVIDER_GOOGLE}
@@ -733,6 +767,19 @@ export default function ConfirmBookingScreen() {
                                     </View>
                                 </Marker>
                             )}
+
+                            {/* Stops Markers */}
+                            {bookingStatus === 'idle' && stops.map((stop, index) => (
+                                <Marker
+                                    key={`stop-${index}`}
+                                    coordinate={{ latitude: stop.latitude, longitude: stop.longitude }}
+                                    anchor={{ x: 0.5, y: 0.5 }}
+                                >
+                                    <View className="bg-white p-1 rounded-full border border-orange-400 shadow-sm">
+                                        <View className="w-2 h-2 bg-orange-400 rounded-full" />
+                                    </View>
+                                </Marker>
+                            ))}
                             {(routeOrigin && routeDestination) && (
                                 <>
                                     {mapProvider === 'google' ? (
@@ -824,10 +871,10 @@ export default function ConfirmBookingScreen() {
                                 description={`Plate: ${driver.driver?.vehicle_plate || '-'}`}
                                 anchor={{ x: 0.5, y: 0.5 }}
                             >
-                                <PetGoCarIcon width={40} height={40} />
+                                <PetGoCarIcon width={24} height={48} />
                             </Marker>
                         ))}
-                </MapView>
+                </AppMapView>
 
                 {/* Back Button Overlay */}
                 <TouchableOpacity
@@ -895,20 +942,39 @@ export default function ConfirmBookingScreen() {
 
                         {/* Route Details */}
                         <View className="mb-6 space-y-4">
-                            <View className="flex-row items-center">
+                            <View className="flex-row items-start">
                                 <View className="w-8 items-center mr-3">
                                     <View className="w-3 h-3 bg-blue-500 rounded-full" />
-                                    <View className="w-0.5 h-8 bg-gray-200 my-1" />
+                                    <View className="w-0.5 min-h-[40px] bg-gray-200 my-1" />
+                                    {stops.length > 0 && (
+                                        <>
+                                            {stops.map((_, i) => (
+                                                <React.Fragment key={`line-${i}`}>
+                                                    <View className="w-3 h-3 bg-orange-400 rounded-full" />
+                                                    <View className="w-0.5 min-h-[40px] bg-gray-200 my-1" />
+                                                </React.Fragment>
+                                            ))}
+                                        </>
+                                    )}
                                     <View className="w-3 h-3 bg-red-500 rounded-sm" />
                                 </View>
-                                <View className="flex-1 space-y-6">
+                                <View className="flex-1 space-y-4">
                                     <View>
-                                        <Text className="text-gray-500 text-xs uppercase mb-1">{t('pick_up')}</Text>
+                                        <Text className="text-gray-500 text-[10px] uppercase mb-1">{t('pick_up')}</Text>
                                         <Text className="font-semibold text-gray-800" numberOfLines={1}>{pickupLocation?.name}</Text>
                                         <Text className="text-gray-500 text-xs" numberOfLines={1}>{pickupLocation?.address}</Text>
                                     </View>
+
+                                    {stops.map((stop, index) => (
+                                        <View key={`stop-summary-${index}`}>
+                                            <Text className="text-gray-500 text-[10px] uppercase mb-1">{t('stop') || 'Stop'} {index + 1}</Text>
+                                            <Text className="font-semibold text-gray-800" numberOfLines={1}>{stop.name || stop.address}</Text>
+                                            <Text className="text-gray-500 text-xs" numberOfLines={1}>{stop.address}</Text>
+                                        </View>
+                                    ))}
+
                                     <View>
-                                        <Text className="text-gray-500 text-xs uppercase mb-1">{t('drop_off')}</Text>
+                                        <Text className="text-gray-500 text-[10px] uppercase mb-1">{t('drop_off')}</Text>
                                         <Text className="font-semibold text-gray-800" numberOfLines={1}>{dropoffLocation?.name}</Text>
                                         <Text className="text-gray-500 text-xs" numberOfLines={1}>{dropoffLocation?.address}</Text>
                                     </View>
@@ -952,8 +1018,20 @@ export default function ConfirmBookingScreen() {
                                             }`}
                                     >
                                         {/* Image Placeholder */}
-                                        <View className="h-20 w-full mb-2 bg-gray-100 rounded-lg justify-center items-center">
-                                            <Text className="text-gray-400 text-xs">{vehicle.id}</Text>
+                                        <View className="h-20 w-full mb-2 bg-gray-50 rounded-lg justify-center items-center overflow-hidden">
+                                            {(vehicle.image && (vehicle.image.startsWith('http') || vehicle.image.startsWith('file'))) ? (
+                                                <Image
+                                                    source={{ uri: vehicle.image }}
+                                                    className="w-full h-full"
+                                                    resizeMode="contain"
+                                                />
+                                            ) : (
+                                                <View className="items-center">
+                                                    {vehicle.id === 'motorcycle' || vehicle.id === 'bike' ? <Bike size={32} color="#4B5563" /> :
+                                                        vehicle.id === 'van' || vehicle.id === 'truck' ? <Truck size={32} color="#4B5563" /> :
+                                                            <Car size={32} color="#4B5563" />}
+                                                </View>
+                                            )}
                                         </View>
                                         <Text className="font-bold text-gray-800">{vehicle.name}</Text>
                                         <Text className="text-primary font-bold">
@@ -971,70 +1049,81 @@ export default function ConfirmBookingScreen() {
 
                         {/* Payment Method Selection */}
                         <Text className="text-lg font-bold mb-3 text-gray-900">{t('payment_method')}</Text>
-                        <View className="flex-row gap-4 mb-6">
-                            <TouchableOpacity
-                                onPress={() => setPaymentMethod('cash')}
-                                className={`flex-1 p-4 rounded-xl border-2 items-center flex-row ${paymentMethod === 'cash' ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white'}`}
-                            >
-                                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${paymentMethod === 'cash' ? 'bg-primary' : 'bg-gray-100'}`}>
-                                    <Wallet size={20} color={paymentMethod === 'cash' ? 'white' : 'gray'} />
-                                </View>
-                                <Text className={`font-semibold ${paymentMethod === 'cash' ? 'text-primary' : 'text-gray-500'}`}>{t('cash')}</Text>
-                            </TouchableOpacity>
+                        <View className="flex-row gap-4 mb-6 flex-wrap">
+                            {paymentConfig.cash && (
+                                <TouchableOpacity
+                                    onPress={() => setPaymentMethod('cash')}
+                                    className={`flex-1 p-4 rounded-xl border-2 items-center flex-row ${paymentMethod === 'cash' ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white'}`}
+                                    style={{ minWidth: '45%' }}
+                                >
+                                    <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${paymentMethod === 'cash' ? 'bg-primary' : 'bg-gray-100'}`}>
+                                        <Wallet size={20} color={paymentMethod === 'cash' ? 'white' : 'gray'} />
+                                    </View>
+                                    <Text className={`font-semibold ${paymentMethod === 'cash' ? 'text-primary' : 'text-gray-500'}`}>{t('cash')}</Text>
+                                </TouchableOpacity>
+                            )}
 
-                            <TouchableOpacity
-                                onPress={() => setPaymentMethod('promptpay')}
-                                className={`flex-1 p-4 rounded-xl border-2 items-center flex-row ${paymentMethod === 'promptpay' ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white'}`}
-                            >
-                                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${paymentMethod === 'promptpay' ? 'bg-primary' : 'bg-gray-100'}`}>
-                                    <CreditCard size={20} color={paymentMethod === 'promptpay' ? 'white' : 'gray'} />
-                                </View>
-                                <Text className={`font-semibold ${paymentMethod === 'promptpay' ? 'text-primary' : 'text-gray-500'}`}>{t('promptpay')}</Text>
-                            </TouchableOpacity>
+                            {paymentConfig.promptpay && (
+                                <TouchableOpacity
+                                    onPress={() => setPaymentMethod('promptpay')}
+                                    className={`flex-1 p-4 rounded-xl border-2 items-center flex-row ${paymentMethod === 'promptpay' ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white'}`}
+                                    style={{ minWidth: '45%' }}
+                                >
+                                    <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${paymentMethod === 'promptpay' ? 'bg-primary' : 'bg-gray-100'}`}>
+                                        <CreditCard size={20} color={paymentMethod === 'promptpay' ? 'white' : 'gray'} />
+                                    </View>
+                                    <Text className={`font-semibold ${paymentMethod === 'promptpay' ? 'text-primary' : 'text-gray-500'}`}>{t('promptpay')}</Text>
+                                </TouchableOpacity>
+                            )}
 
-                            <TouchableOpacity
-                                onPress={() => setPaymentMethod('wallet')}
-                                className={`flex-1 p-4 rounded-xl border-2 items-center flex-row ${paymentMethod === 'wallet' ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white'}`}
-                            >
-                                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${paymentMethod === 'wallet' ? 'bg-primary' : 'bg-gray-100'}`}>
-                                    <Wallet size={20} color={paymentMethod === 'wallet' ? 'white' : 'gray'} />
-                                </View>
-                                <View>
-                                    <Text className={`font-semibold ${paymentMethod === 'wallet' ? 'text-primary' : 'text-gray-500'}`}>วอลเล็ท</Text>
-                                    <Text className={`text-[10px] ${walletBalance < price ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
-                                        ฿{formatPrice(walletBalance)}
-                                    </Text>
-                                </View>
-                            </TouchableOpacity>
-                        </View>
-
-                        <View className="flex-row gap-4 mb-6">
-                            <TouchableOpacity
-                                onPress={() => {
-                                    if (savedCards.length > 0) {
-                                        setPaymentMethod('stripe');
-                                    } else {
-                                        router.push('/(customer)/payment-methods');
-                                    }
-                                }}
-                                className={`flex-1 p-4 rounded-xl border-2 items-center flex-row ${paymentMethod === 'stripe' ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white'}`}
-                            >
-                                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${paymentMethod === 'stripe' ? 'bg-primary' : 'bg-gray-100'}`}>
-                                    <CreditCard size={20} color={paymentMethod === 'stripe' ? 'white' : 'gray'} />
-                                </View>
-                                <View className="flex-1">
-                                    <Text className={`font-semibold ${paymentMethod === 'stripe' ? 'text-primary' : 'text-gray-500'}`}>
-                                        {savedCards.length > 0 ? 'บัตรเครดิต' : 'เพิ่มบัตรเครดิต'}
-                                    </Text>
-                                    {savedCards.length > 0 && (
-                                        <Text className={`text-[10px] ${paymentMethod === 'stripe' ? 'text-primary/70' : 'text-gray-400'}`}>
-                                            {savedCards[0].brand} •••• {savedCards[0].last4}
+                            {paymentConfig.wallet && (
+                                <TouchableOpacity
+                                    onPress={() => setPaymentMethod('wallet')}
+                                    className={`flex-1 p-4 rounded-xl border-2 items-center flex-row ${paymentMethod === 'wallet' ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white'}`}
+                                    style={{ minWidth: '45%' }}
+                                >
+                                    <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${paymentMethod === 'wallet' ? 'bg-primary' : 'bg-gray-100'}`}>
+                                        <Wallet size={20} color={paymentMethod === 'wallet' ? 'white' : 'gray'} />
+                                    </View>
+                                    <View>
+                                        <Text className={`font-semibold ${paymentMethod === 'wallet' ? 'text-primary' : 'text-gray-500'}`}>วอลเล็ท</Text>
+                                        <Text className={`text-[10px] ${walletBalance < price ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
+                                            ฿{formatPrice(walletBalance)}
                                         </Text>
-                                    )}
-                                </View>
-                            </TouchableOpacity>
-                            <View className="flex-1" />
+                                    </View>
+                                </TouchableOpacity>
+                            )}
                         </View>
+
+                        {paymentConfig.stripe && (
+                            <View className="flex-row gap-4 mb-6">
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        if (savedCards.length > 0) {
+                                            setPaymentMethod('stripe');
+                                        } else {
+                                            router.push('/(customer)/payment-methods');
+                                        }
+                                    }}
+                                    className={`flex-1 p-4 rounded-xl border-2 items-center flex-row ${paymentMethod === 'stripe' ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white'}`}
+                                >
+                                    <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${paymentMethod === 'stripe' ? 'bg-primary' : 'bg-gray-100'}`}>
+                                        <CreditCard size={20} color={paymentMethod === 'stripe' ? 'white' : 'gray'} />
+                                    </View>
+                                    <View className="flex-1">
+                                        <Text className={`font-semibold ${paymentMethod === 'stripe' ? 'text-primary' : 'text-gray-500'}`}>
+                                            {savedCards.length > 0 ? 'บัตรเครดิต' : 'เพิ่มบัตรเครดิต'}
+                                        </Text>
+                                        {savedCards.length > 0 && (
+                                            <Text className={`text-[10px] ${paymentMethod === 'stripe' ? 'text-primary/70' : 'text-gray-400'}`}>
+                                                {savedCards[0].brand} •••• {savedCards[0].last4}
+                                            </Text>
+                                        )}
+                                    </View>
+                                </TouchableOpacity>
+                                <View className="flex-1" />
+                            </View>
+                        )}
                         <TextInput
                             placeholder="Note to driver (optional)"
                             value={note}
@@ -1094,6 +1183,7 @@ export default function ConfirmBookingScreen() {
                             )}
                         </View>
                         <AppButton
+                            className="mb-10"
                             title="Confirm Booking"
                             onPress={handleBook}
                             size="lg"
@@ -1104,11 +1194,11 @@ export default function ConfirmBookingScreen() {
                 {bookingStatus === 'searching' && (
                     <View className="p-8 items-center bg-white" style={{ paddingBottom: insets.bottom + 10 }}>
                         <ActivityIndicator size="large" color="#00A862" className="mb-4" />
-                        <Text className="text-lg font-bold text-gray-800">Finding your driver...</Text>
-                        <Text className="text-gray-500 mt-2 text-center mb-6">We are connecting you with the nearest {selectedVehicle?.name}</Text>
+                        <Text className="text-lg font-bold text-gray-800">{t('finding_driver')}</Text>
+                        <Text className="text-gray-500 mt-2 text-center mb-6">{t('connecting_nearest', { vehicle: selectedVehicle?.name })}</Text>
 
                         <AppButton
-                            title={isCancelling ? "Cancelling..." : "Cancel Order"}
+                            title={isCancelling ? t('cancelling') : t('cancel_order')}
                             variant="secondary"
                             onPress={handleCancelOrder}
                             disabled={isCancelling}
@@ -1121,9 +1211,9 @@ export default function ConfirmBookingScreen() {
                 {bookingStatus === 'confirmed' && assignedDriver && (
                     <View className="p-5 border-t border-gray-100 bg-white" style={{ paddingBottom: insets.bottom + 10 }}>
                         <Text className="text-lg font-bold text-green-600 mb-4 text-center">
-                            {currentOrder?.status === 'arrived' ? 'Driver Arrived!' :
-                                (currentOrder?.status === 'in_progress' || currentOrder?.status === 'picked_up') ? 'Heading to destination' :
-                                    'Driver Found!'}
+                            {currentOrder?.status === 'arrived' ? t('driver_arrived') :
+                                (currentOrder?.status === 'in_progress' || currentOrder?.status === 'picked_up') ? t('heading_to_destination') :
+                                    t('driver_found')}
                         </Text>
 
                         <View className="flex-row items-center mb-6">
@@ -1131,7 +1221,7 @@ export default function ConfirmBookingScreen() {
                                 <Text className="text-2xl">👨‍✈️</Text>
                             </View>
                             <View className="flex-1">
-                                <Text className="text-xl font-bold text-gray-900">{assignedDriver.driver?.user?.full_name}</Text>
+                                <Text className="text-xl font-bold text-gray-900">{assignedDriver.driver?.full_name || assignedDriver.driver?.user?.full_name}</Text>
                                 <View className="flex-row items-center mt-1">
                                     <Star size={14} color="#F59E0B" fill="#F59E0B" />
                                     <Text className="text-sm font-semibold ml-1">4.9</Text>
@@ -1139,22 +1229,54 @@ export default function ConfirmBookingScreen() {
                                 </View>
                             </View>
                             <View className="items-end">
+                                {assignedDriver.driver?.vehicle_image ? (
+                                    <Image
+                                        source={{ uri: assignedDriver.driver.vehicle_image }}
+                                        className="w-16 h-10 mb-1 rounded-md"
+                                        resizeMode="contain"
+                                    />
+                                ) : (
+                                    <View className="w-16 h-10 mb-1 bg-gray-100 rounded-md items-center justify-center">
+                                        <Car size={20} color="#9CA3AF" />
+                                    </View>
+                                )}
                                 <Text className="font-bold text-lg text-gray-800">{assignedDriver.driver?.vehicle_plate}</Text>
                                 <Text className="text-xs text-gray-500">{assignedDriver.driver?.vehicle_type}</Text>
                             </View>
                         </View>
 
                         <View className="flex-row space-x-3 mb-4">
-                            <TouchableOpacity className="flex-1 bg-green-500 py-3 rounded-xl flex-row justify-center items-center">
+                            <TouchableOpacity
+                                className="flex-1 bg-green-500 py-3 rounded-xl flex-row justify-center items-center"
+                                onPress={async () => {
+                                    const driverPhone = assignedDriver?.driver?.phone || assignedDriver?.driver?.user?.phone;
+                                    if (driverPhone) {
+                                        const url = `tel:${driverPhone}`;
+                                        try {
+                                            const canOpen = await Linking.canOpenURL(url);
+                                            if (canOpen) {
+                                                Linking.openURL(url);
+                                            } else {
+                                                Alert.alert(t('call'), `${t('driver')}: ${driverPhone}`);
+                                            }
+                                        } catch (error) {
+                                            // Fallback for simulators or missing Info.plist config
+                                            Alert.alert(t('call'), `${t('driver')}: ${driverPhone}`);
+                                        }
+                                    } else {
+                                        Alert.alert(t('error'), t('phone_not_available'));
+                                    }
+                                }}
+                            >
                                 <Phone size={20} color="white" className="mr-2" />
-                                <Text className="text-white font-bold">Call</Text>
+                                <Text className="text-white font-bold">{t('call')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 className="flex-1 bg-blue-100 py-3 rounded-xl flex-row justify-center items-center"
                                 onPress={() => router.push(`/(customer)/chat/${currentOrder?.id || 1}`)}
                             >
                                 <MessageCircle size={20} color="#2563EB" className="mr-2" />
-                                <Text className="text-blue-600 font-bold">Chat</Text>
+                                <Text className="text-blue-600 font-bold">{t('chat')}</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -1170,15 +1292,15 @@ export default function ConfirmBookingScreen() {
                                 <CreditCard size={20} color="white" className="mr-2" />
                                 <Text className="text-white font-bold text-lg">
                                     {paymentMethod === 'cash' && currentOrder?.status !== 'completed'
-                                        ? 'ชำระเมื่อถึงที่หมาย (เงินสด)'
-                                        : `Pay Now (฿${formatPrice(price)})`}
+                                        ? t('pay_at_destination_cash')
+                                        : `${t('pay_now')} (฿${formatPrice(price)})`}
                                 </Text>
                             </TouchableOpacity>
                         )}
 
                         {(currentOrder?.status === 'accepted' || currentOrder?.status === 'pending') && (
                             <AppButton
-                                title="Cancel Booking"
+                                title={t('cancel_booking')}
                                 onPress={async () => {
                                     if (currentOrder) {
                                         console.log(`Canceling order ${currentOrder.id}`);
@@ -1188,11 +1310,11 @@ export default function ConfirmBookingScreen() {
                                             setCurrentOrder(null);
                                             setAssignedDriver(null);
                                             clearBooking();
-                                            Alert.alert('Booking Cancelled', 'Your booking has been cancelled.', [
-                                                { text: 'OK', onPress: () => router.replace('/(customer)/(tabs)/home') }
+                                            Alert.alert(t('booking_cancelled'), t('booking_cancelled_desc'), [
+                                                { text: t('confirm'), onPress: () => router.replace('/(customer)/(tabs)/home') }
                                             ]);
                                         } catch (error) {
-                                            Alert.alert('Error', 'Failed to cancel booking');
+                                            Alert.alert(t('error'), 'Failed to cancel booking');
                                         }
                                     } else {
                                         setBookingStatus('idle');
@@ -1204,9 +1326,10 @@ export default function ConfirmBookingScreen() {
                             />
                         )}
                     </View>
-                )}
+                )
+                }
 
             </Animated.View>
-        </View >
+        </View>
     );
 }

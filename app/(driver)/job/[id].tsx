@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Alert, ActivityIndicator, Animated, PanResponder, Dimensions, ScrollView, Platform, Linking } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, router } from 'expo-router';
 import { AppButton } from '../../../components/ui/AppButton';
 import { Phone, MessageCircle, ArrowLeft, Navigation as NavIcon, User, Wallet, CreditCard } from 'lucide-react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView from 'react-native-maps';
+import { AppMapView } from '../../../components/AppMapView';
 import { PetGoCarIcon } from '../../../components/icons/PetGoCarIcon';
 import { useJobStore } from '../../../store/useJobStore';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -17,6 +20,7 @@ const HERE_API_KEY = process.env.EXPO_PUBLIC_HERE_MAPS_API_KEY || "";
 
 export default function ActiveJobScreen() {
     const { id } = useLocalSearchParams();
+    const { t } = useTranslation();
     const { activeJob, setActiveJob } = useJobStore();
     const mapRef = useRef<MapView>(null);
     const [status, setStatus] = useState<Order['status']>('accepted');
@@ -205,8 +209,8 @@ export default function ActiveJobScreen() {
                     setStatus('accepted');
                 } else if (fetchedOrder.status === 'cancelled' || fetchedOrder.status === 'pending') {
                     if (isPolling) {
-                        Alert.alert('Job Cancelled', 'The customer has cancelled this request.', [
-                            { text: 'OK', onPress: () => router.replace('/(driver)/(tabs)/home') }
+                        Alert.alert(t('booking_cancelled'), t('booking_cancelled_desc'), [
+                            { text: t('confirm'), onPress: () => router.replace('/(driver)/(tabs)/home') }
                         ]);
                     }
                 }
@@ -257,10 +261,10 @@ export default function ActiveJobScreen() {
                     order.pickup_lng
                 );
 
-                if (dist > 200) {
-                    Alert.alert("Check-in Failed", `You are too far from the pickup location (${dist.toFixed(0)}m). You must be within 200m.`);
-                    return;
-                }
+                // if (dist > 200) {
+                //     Alert.alert("Check-in Failed", `You are too far from the pickup location (${dist.toFixed(0)}m). You must be within 200m.`);
+                //     return;
+                // }
 
                 await orderService.updateOrderStatus(order.id, 'arrived');
                 setStatus('arrived');
@@ -286,6 +290,25 @@ export default function ActiveJobScreen() {
     const handleChat = () => {
         if (order) {
             router.push(`/(driver)/chat/${order.id}`);
+        }
+    };
+
+    const handleCall = async () => {
+        if (order?.customer?.phone) {
+            const url = `tel:${order.customer.phone}`;
+            try {
+                const canOpen = await Linking.canOpenURL(url);
+                if (canOpen) {
+                    Linking.openURL(url);
+                } else {
+                    Alert.alert(t('call'), `${t('customer')}: ${order.customer.phone}`);
+                }
+            } catch (error) {
+                // Fallback for simulators or missing Info.plist config
+                Alert.alert(t('call'), `${t('customer')}: ${order.customer.phone}`);
+            }
+        } else {
+            Alert.alert(t('error'), t('phone_not_available'));
         }
     };
 
@@ -335,7 +358,7 @@ export default function ActiveJobScreen() {
     return (
         <View className="flex-1 bg-white">
             <View className="absolute top-0 left-0 right-0 bottom-0 bg-gray-200">
-                <MapView
+                <AppMapView
                     ref={mapRef}
                     style={{ flex: 1 }}
                     initialRegion={initialRegion}
@@ -354,7 +377,7 @@ export default function ActiveJobScreen() {
                             title="You"
                             anchor={{ x: 0.5, y: 0.5 }}
                         >
-                            <PetGoCarIcon width={40} height={40} />
+                            <PetGoCarIcon width={24} height={48} />
                         </Marker>
                     )}
                     <Marker
@@ -407,7 +430,7 @@ export default function ActiveJobScreen() {
                             </View>
                         </Marker>
                     )}
-                </MapView>
+                </AppMapView>
 
                 <TouchableOpacity
                     onPress={() => router.back()}
@@ -482,7 +505,10 @@ export default function ActiveJobScreen() {
                                 >
                                     <MessageCircle size={20} color="black" />
                                 </TouchableOpacity>
-                                <TouchableOpacity className="bg-green-500 p-3 rounded-full">
+                                <TouchableOpacity
+                                    className="bg-green-500 p-3 rounded-full"
+                                    onPress={handleCall}
+                                >
                                     <Phone size={20} color="white" />
                                 </TouchableOpacity>
                             </View>
@@ -513,7 +539,7 @@ export default function ActiveJobScreen() {
                                 )}
                                 {order.passengers && (
                                     <Text className="text-xs text-gray-500 mt-1">
-                                        Passengers: {order.passengers}
+                                        {t('passengers_label', { count: order.passengers })}
                                     </Text>
                                 )}
                             </View>
@@ -528,12 +554,12 @@ export default function ActiveJobScreen() {
                                 )}
                             </View>
                             <View className="flex-1">
-                                <Text className="text-xs text-gray-500 uppercase font-bold tracking-wider">Payment Method</Text>
-                                <Text className="text-gray-900 font-semibold capitalize">{order.payment_method || 'Cash'}</Text>
+                                <Text className="text-xs text-gray-500 uppercase font-bold tracking-wider">{t('payment_method')}</Text>
+                                <Text className="text-gray-900 font-semibold capitalize">{order.payment_method === 'cash' ? t('cash') : order.payment_method || t('cash')}</Text>
                             </View>
                             <View className={`px-3 py-1 rounded-full ${order.payment_status === 'paid' ? 'bg-green-100' : 'bg-orange-100'}`}>
                                 <Text className={`text-xs font-bold ${order.payment_status === 'paid' ? 'text-green-700' : 'text-orange-700'}`}>
-                                    {order.payment_status?.toUpperCase() || 'PENDING'}
+                                    {order.payment_status === 'paid' ? t('paid') : t('pending')}
                                 </Text>
                             </View>
                         </View>
@@ -542,22 +568,22 @@ export default function ActiveJobScreen() {
                         <TouchableOpacity
                             onPress={() => {
                                 Alert.alert(
-                                    "Cancel/Release Job",
-                                    "Are you sure you want to cancel this job? It will be released back to other drivers.",
+                                    t('cancel_release_job'),
+                                    t('cancel_release_confirm'),
                                     [
-                                        { text: "No", style: "cancel" },
+                                        { text: t('no'), style: "cancel" },
                                         {
-                                            text: "Yes, Cancel",
+                                            text: t('yes_cancel'),
                                             style: 'destructive',
                                             onPress: async () => {
                                                 try {
                                                     await orderService.cancelOrder(order.id, activeJob?.driver?.id);
                                                     setActiveJob(null);
-                                                    Alert.alert("Job Cancelled", "You have released this job.", [
-                                                        { text: "OK", onPress: () => router.replace('/(driver)/(tabs)/home') }
+                                                    Alert.alert(t('booking_cancelled'), t('job_released_desc'), [
+                                                        { text: t('confirm'), onPress: () => router.replace('/(driver)/(tabs)/home') }
                                                     ]);
                                                 } catch (error) {
-                                                    Alert.alert("Error", "Failed to cancel job.");
+                                                    Alert.alert(t('error'), t('failed_to_cancel'));
                                                     console.error(error);
                                                 }
                                             }
@@ -567,7 +593,7 @@ export default function ActiveJobScreen() {
                             }}
                             className="bg-red-50 p-4 rounded-xl items-center mb-6 border border-red-100"
                         >
-                            <Text className="text-red-500 font-bold">Cancel Job</Text>
+                            <Text className="text-red-500 font-bold">{t('cancel_job')}</Text>
                         </TouchableOpacity>
 
                         <View className="h-24" />
@@ -577,9 +603,9 @@ export default function ActiveJobScreen() {
                 <View className="absolute bottom-0 left-0 right-0 p-5 bg-white border-t border-gray-100 pb-10">
                     <AppButton
                         title={
-                            status === 'accepted' ? 'Arrived at Pickup' :
-                                status === 'arrived' ? 'Start traveling' :
-                                    order.payment_status === 'paid' ? 'Complete Job' : 'Complete & Collect Payment'
+                            status === 'accepted' ? t('arrived_at_pickup') :
+                                status === 'arrived' ? t('start_traveling') :
+                                    order.payment_status === 'paid' ? t('complete_job') : t('complete_collect_payment')
                         }
                         onPress={handleAction}
                         className={status === 'in_progress' ? 'bg-red-500' : 'bg-green-600'}

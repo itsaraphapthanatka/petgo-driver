@@ -46,7 +46,9 @@ export const petService = {
         const response = await fetch(`${API_BASE_URL}/pets/`, { headers });
 
         if (!response.ok) {
-            throw new Error('Failed to fetch pets');
+            const errorText = await response.text();
+            console.error(`Fetch pets error: ${response.status} - ${errorText}`);
+            throw new Error(`Failed to fetch pets: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();

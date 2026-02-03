@@ -1,5 +1,5 @@
 import React from 'react';
-import Svg, { Path, Ellipse, G, Defs, ClipPath, Rect } from 'react-native-svg';
+import Svg, { Path, Ellipse, G, Defs, ClipPath, Rect, LinearGradient, Stop } from 'react-native-svg';
 
 interface CarIconProps {
     width?: number;
@@ -8,78 +8,47 @@ interface CarIconProps {
 
 export const PetGoCarIcon: React.FC<CarIconProps> = ({ width = 48, height = 48 }) => {
     return (
-        <Svg width={width} height={height} viewBox="0 0 120 120" fill="none">
-            {/* Shadow */}
-            <Ellipse cx="60" cy="100" rx="30" ry="8" fill="#00000020" />
+        <Svg width={width} height={height} viewBox="0 0 100 200" fill="none">
+            {/* Simple Shadow */}
+            <Ellipse cx="50" cy="110" rx="40" ry="100" fill="black" fillOpacity={0.15} />
 
-            {/* Car Body - Main */}
-            <G>
-                {/* Bottom part */}
-                <Path
-                    d="M 30 70 L 25 85 L 35 90 L 85 90 L 95 85 L 90 70 Z"
-                    fill="#1BA1B5"
-                />
+            {/* Main Body */}
+            <Rect x="10" y="10" width="80" height="180" rx="40" fill="url(#body_grad)" />
 
-                {/* Top part - Hood */}
-                <Path
-                    d="M 35 50 Q 40 40 60 40 Q 80 40 85 50 L 90 70 L 30 70 Z"
-                    fill="#1BA1B5"
-                />
+            {/* Windshield */}
+            <Path
+                d="M25 60C25 45 40 40 50 40C60 40 75 45 75 60L72 85H28L25 60Z"
+                fill="url(#glass_grad)"
+            />
 
-                {/* Windshield */}
-                <Path
-                    d="M 42 52 Q 45 45 60 45 Q 75 45 78 52 L 82 68 L 38 68 Z"
-                    fill="#A0E7F0"
-                    opacity="0.7"
-                />
+            {/* Rear Window */}
+            <Path
+                d="M28 140H72L75 160C75 175 60 180 50 180C40 180 25 175 25 160L28 140Z"
+                fill="url(#glass_grad)"
+            />
 
-                {/* Side Window */}
-                <Path
-                    d="M 70 55 L 78 55 L 82 68 L 72 68 Z"
-                    fill="#A0E7F0"
-                    opacity="0.7"
-                />
-
-                {/* Front Logo "S" */}
-                <Path
-                    d="M 50 60 Q 48 58 50 56 Q 52 54 54 56 Q 56 58 54 60 Q 52 62 50 60 Z"
-                    fill="white"
-                />
-            </G>
+            {/* Roof */}
+            <Rect x="28" y="80" width="44" height="65" rx="5" fill="#334155" />
 
             {/* Headlights */}
-            <Ellipse cx="35" cy="48" rx="3" ry="4" fill="#2C3E50" />
-            <Ellipse cx="85" cy="48" rx="3" ry="4" fill="#2C3E50" />
+            <Rect x="18" y="30" width="12" height="6" rx="3" fill="#F1F5F9" fillOpacity={0.8} />
+            <Rect x="70" y="30" width="12" height="6" rx="3" fill="#F1F5F9" fillOpacity={0.8} />
 
-            {/* Wheels */}
-            <G>
-                {/* Front Wheel */}
-                <Ellipse cx="75" cy="90" rx="10" ry="10" fill="#2C3E50" />
-                <Ellipse cx="75" cy="90" rx="6" ry="6" fill="#95A5A6" />
+            {/* Tail lights */}
+            <Rect x="18" y="175" width="12" height="4" rx="2" fill="#EF4444" />
+            <Rect x="70" y="175" width="12" height="4" rx="2" fill="#EF4444" />
 
-                {/* Back Wheel */}
-                <Ellipse cx="45" cy="90" rx="10" ry="10" fill="#2C3E50" />
-                <Ellipse cx="45" cy="90" rx="6" ry="6" fill="#95A5A6" />
-            </G>
-
-            {/* PetGO Text */}
-            <G>
-                {/* P */}
-                <Path d="M 50 72 L 50 82 M 50 72 L 54 72 Q 56 72 56 74 Q 56 76 54 76 L 50 76"
-                    stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                {/* e */}
-                <Path d="M 58 78 Q 58 76 60 76 Q 62 76 62 78 Q 62 80 60 80 L 58 80"
-                    stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                {/* t */}
-                <Path d="M 63 74 L 63 80 M 61 76 L 65 76"
-                    stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                {/* G */}
-                <Path d="M 70 76 Q 68 76 68 78 Q 68 80 70 80 L 72 80 L 72 78"
-                    stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                {/* O */}
-                <Path d="M 76 78 Q 76 76 78 76 Q 80 76 80 78 Q 80 80 78 80 Q 76 80 76 78"
-                    stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </G>
+            <Defs>
+                <LinearGradient id="body_grad" x1="50" y1="10" x2="50" y2="190" gradientUnits="userSpaceOnUse">
+                    <Stop offset="0" stopColor="#475569" />
+                    <Stop offset="0.5" stopColor="#1E293B" />
+                    <Stop offset="1" stopColor="#0F172A" />
+                </LinearGradient>
+                <LinearGradient id="glass_grad" x1="50" y1="40" x2="50" y2="180" gradientUnits="userSpaceOnUse">
+                    <Stop offset="0" stopColor="#94A3B8" stopOpacity={0.6} />
+                    <Stop offset="1" stopColor="#475569" stopOpacity={0.8} />
+                </LinearGradient>
+            </Defs>
         </Svg>
     );
 };

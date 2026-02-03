@@ -1,11 +1,17 @@
 import React, { forwardRef } from 'react';
+import { PROVIDER_GOOGLE, Marker, Polyline } from 'react-native-maps';
 import MapView from 'react-native-maps';
-import { Polyline } from 'react-native-maps';
+import { AppMapView } from '../../../AppMapView';
 
 export const BookingMap = forwardRef<MapView, any>(
-    ({ initialRegion, route }, ref) => {
+    ({ initialRegion, route }, mapRef) => {
         return (
-            <MapView ref={ref} style={{ flex: 1 }} initialRegion={initialRegion}>
+            <AppMapView
+                ref={mapRef}
+                style={{ flex: 1 }}
+                provider={PROVIDER_GOOGLE}
+                initialRegion={initialRegion}
+            >
                 {route && (
                     <Polyline
                         coordinates={route.coordinates}
@@ -13,7 +19,7 @@ export const BookingMap = forwardRef<MapView, any>(
                         strokeColor="#2563EB"
                     />
                 )}
-            </MapView>
+            </AppMapView>
         );
     }
 );

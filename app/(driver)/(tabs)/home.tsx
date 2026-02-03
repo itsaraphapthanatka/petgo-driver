@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Switch, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useJobStore } from '../../../store/useJobStore';
@@ -12,6 +13,7 @@ import { api } from '../../../services/api';
 import { formatPrice } from '../../../utils/format';
 
 export default function DriverHomeScreen() {
+    const { t } = useTranslation();
     const { user } = useAuthStore();
     const { pendingJobs, isLoading, error, fetchPendingJobs, acceptJob, declineJob } = useJobStore();
     const [isOnline, setIsOnline] = useState(false);
@@ -286,9 +288,9 @@ export default function DriverHomeScreen() {
             {/* Header Status */}
             <View className="bg-white p-5 shadow-sm flex-row justify-between items-center mb-4">
                 <View>
-                    <Text className="text-gray-500 text-xs">Driver Status</Text>
+                    <Text className="text-gray-500 text-xs">{t('driver_status')}</Text>
                     <Text className={`font-bold text-lg ${isOnline ? 'text-green-600' : 'text-gray-400'}`}>
-                        {isOnline ? 'ONLINE' : 'OFFLINE'}
+                        {isOnline ? t('online') : t('offline')}
                     </Text>
                 </View>
                 <View className="flex-row items-center">
@@ -315,20 +317,20 @@ export default function DriverHomeScreen() {
                     <View className="bg-gray-200 w-20 h-20 rounded-full items-center justify-center mb-4">
                         <Navigation size={40} color="gray" />
                     </View>
-                    <Text className="text-xl font-bold text-gray-400 text-center">You are Offline</Text>
-                    <Text className="text-gray-500 text-center mt-2">Go online to start receiving pet transport requests.</Text>
+                    <Text className="text-xl font-bold text-gray-400 text-center">{t('you_are_offline')}</Text>
+                    <Text className="text-gray-500 text-center mt-2">{t('offline_desc')}</Text>
                 </View>
             ) : isLoading && pendingJobs.length === 0 ? (
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="large" color="#00C853" />
-                    <Text className="text-gray-500 mt-4">Loading jobs...</Text>
+                    <Text className="text-gray-500 mt-4">{t('loading_jobs')}</Text>
                 </View>
             ) : error ? (
                 <View className="flex-1 items-center justify-center p-10">
                     <AlertCircle size={48} color="#EF4444" />
                     <Text className="text-red-500 font-bold mt-4 text-center">{error}</Text>
                     <AppButton
-                        title="Retry"
+                        title={t('retry')}
                         onPress={fetchPendingJobs}
                         className="mt-4"
                     />
@@ -338,8 +340,8 @@ export default function DriverHomeScreen() {
                     <View className="bg-green-100 w-20 h-20 rounded-full items-center justify-center mb-4">
                         <Navigation size={40} color="#00C853" />
                     </View>
-                    <Text className="text-xl font-bold text-gray-600 text-center">You're Online!</Text>
-                    <Text className="text-gray-500 text-center mt-2">Waiting for new pet transport requests...</Text>
+                    <Text className="text-xl font-bold text-gray-600 text-center">{t('no_jobs_online')}</Text>
+                    <Text className="text-gray-500 text-center mt-2">{t('waiting_requests')}</Text>
                 </View>
             ) : (
                 <FlatList
@@ -348,7 +350,7 @@ export default function DriverHomeScreen() {
                     contentContainerStyle={{ padding: 20 }}
                     ListHeaderComponent={() => (
                         <Text className="text-lg font-bold mb-4">
-                            Incoming Requests ({pendingJobs.length})
+                            {t('incoming_requests')} ({pendingJobs.length})
                         </Text>
                     )}
                     renderItem={renderJob}

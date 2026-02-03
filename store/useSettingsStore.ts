@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-type MapProvider = 'google' | 'here';
+type MapProvider = 'google' | 'here' | 'longdo';
 
 interface SettingsState {
     mapProvider: MapProvider;

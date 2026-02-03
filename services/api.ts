@@ -4,6 +4,7 @@ export interface PricingRequest {
     pickup_lng: number;
     dropoff_lat: number;
     dropoff_lng: number;
+    stops?: { lat: number; lng: number }[];
     vehicle_type: string;
     pet_weight_kg: number;
     provider?: string;
@@ -37,13 +38,17 @@ export interface PaymentResponse {
 }
 
 export interface DriverDetails {
-    user_id: number;
+    user_id?: number;
     vehicle_type: string;
     vehicle_plate: string;
     is_online: boolean;
     work_radius_km: number;
     id: number;
-    user: {
+    full_name?: string;
+    phone?: string;
+    email?: string;
+    vehicle_image?: string;
+    user?: {
         full_name: string;
         phone: string;
         email: string;
@@ -69,6 +74,7 @@ export interface VehicleTypeRate {
 export interface VehicleType {
     key: string;
     name: string;
+    image_url?: string;
     rates: VehicleTypeRate;
 }
 
@@ -112,10 +118,48 @@ export const api = {
             if (!response.ok) {
                 throw new Error('Failed to fetch vehicle types');
             }
-            return await response.json();
+            const data = await response.json();
+            return data.map((v: VehicleType) => ({
+                ...v,
+                image_url: v.image_url?.startsWith('/') ? `${API_BASE_URL}${v.image_url}` : v.image_url
+            }));
         } catch (error) {
             console.warn('Could not fetch vehicle types from backend:', error);
             throw error;
+        }
+    },
+
+
+
+    updatePricingSettings: async (settings: { map: string }): Promise<PricingSettings> => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/pricing/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(settings),
+            });
+            if (!response.ok) {
+                throw new Error('Failed to update pricing settings');
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Could not update pricing settings:', error);
+            throw error;
+        }
+    },
+
+    getPaymentConfig: async (): Promise<{ cash: boolean; promptpay: boolean; wallet: boolean; stripe: boolean }> => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/payments/config`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch payment config');
+            }
+            return await response.json();
+        } catch (error) {
+            console.warn('Could not fetch payment config, using defaults:', error);
+            return { cash: true, promptpay: true, wallet: true, stripe: true };
         }
     },
 
@@ -229,6 +273,23 @@ export const api = {
         } catch (error) {
             console.error('Error updating driver status:', error);
             throw error;
+        }
+    },
+
+    updateDeviceToken: async (token: string): Promise<void> => {
+        try {
+            const headers = await getAuthHeaders();
+            const response = await fetch(`${API_BASE_URL}/users/device-token`, {
+                method: 'PATCH',
+                headers,
+                body: JSON.stringify({ token }),
+            });
+
+            if (!response.ok) {
+                console.warn('Failed to update device token');
+            }
+        } catch (error) {
+            console.warn('Error updating device token', error);
         }
     },
 
@@ -476,6 +537,20 @@ export const api = {
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Charge failed: ${errorText}`);
+        }
+        return response.json();
+    },
+
+    syncPayment: async (orderId: number): Promise<any> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/payments/sync/${orderId}`, {
+            method: 'POST',
+            headers
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.warn('Sync payment failed:', errorText);
+            return { status: 'failed' };
         }
         return response.json();
     }

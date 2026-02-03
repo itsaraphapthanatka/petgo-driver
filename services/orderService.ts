@@ -230,7 +230,12 @@ export const orderService = {
             // Find the most recent active order (assuming API returns sorted or we just take first found)
             const activeOrder = orders.find(o => activeStatuses.includes(o.status));
             return activeOrder || null;
-        } catch (error) {
+        } catch (error: any) {
+            // Suppress Redbox for auth errors (401/403) to allow user to logout
+            if (error.message && (error.message.includes('401') || error.message.includes('403'))) {
+                console.warn('Authentication mismatch in getActiveOrder (ignoring):', error.message);
+                return null;
+            }
             console.error('Error fetching active order:', error);
             return null;
         }

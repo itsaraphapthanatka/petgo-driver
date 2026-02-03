@@ -126,6 +126,7 @@ export const hereMapApi = {
     getRoutes: async (
         origin: LatLng,
         destination: LatLng,
+        stops: LatLng[] = [],
         mode: 'car' | 'truck' | 'scooter' | 'bicycle',
         apiKey: string
     ): Promise<HereRoute[]> => {
@@ -133,9 +134,17 @@ export const hereMapApi = {
             const originStr = `${origin.latitude},${origin.longitude}`;
             const destStr = `${destination.latitude},${destination.longitude}`;
 
+            // Construct via parameters for stops
+            let viaParams = "";
+            if (stops && stops.length > 0) {
+                stops.forEach(stop => {
+                    viaParams += `&via=${stop.latitude},${stop.longitude}`;
+                });
+            }
+
             // Request routes from HERE API with specific mode and traffic spans
             // Ensure spans=dynamicSpeedInfo,length is included!
-            const url = `${HERE_ROUTING_API_URL}?transportMode=${mode}&origin=${originStr}&destination=${destStr}&return=polyline,summary&spans=dynamicSpeedInfo,length&apiKey=${apiKey}`;
+            const url = `${HERE_ROUTING_API_URL}?transportMode=${mode}&origin=${originStr}&destination=${destStr}${viaParams}&return=polyline,summary&spans=dynamicSpeedInfo,length&apiKey=${apiKey}`;
 
             console.log("Fetching HERE Routes with Traffic:", url);
             const response = await fetch(url);
@@ -149,91 +158,107 @@ export const hereMapApi = {
 
             if (data.routes && data.routes.length > 0) {
                 const routes = data.routes.map((route: any, index: number) => {
-                    const section = route.sections[0];
-                    const allCoordinates = section && section.polyline ? decode(section.polyline) : [];
+                    const sections = route.sections || [];
+                    let allCoordinates: LatLng[] = [];
+                    const allSegments: HereRouteSegment[] = [];
 
-                    const distance = section?.summary?.length || 0;
-                    const duration = section?.summary?.duration || 0;
+                    let totalDistance = 0;
+                    let totalDuration = 0;
 
-                    const spans = section?.spans || [];
-                    const segments: HereRouteSegment[] = [];
+                    sections.forEach((section: any, sectionIdx: number) => {
+                        const sectionCoords = section && section.polyline ? decode(section.polyline) : [];
+                        if (sectionCoords.length === 0) return;
 
-                    // GAP FIX: Visual line from Origin to Start of Route
-                    if (origin && allCoordinates.length > 0) {
-                        segments.push({
-                            coordinates: [origin, allCoordinates[0]],
-                            color: '#4285F4' // Same blue as safe route
-                        });
+                        const sectionStartIdx = allCoordinates.length;
+
+                        // Avoid double points at waypoints (waypoints are last of section N and first of section N+1)
+                        if (sectionIdx > 0 && allCoordinates.length > 0) {
+                            allCoordinates = [...allCoordinates, ...sectionCoords.slice(1)];
+                        } else {
+                            allCoordinates = [...allCoordinates, ...sectionCoords];
+                        }
+
+                        totalDistance += section?.summary?.length || 0;
+                        totalDuration += section?.summary?.duration || 0;
+
+                        const spans = section?.spans || [];
+
+                        if (spans.length > 0) {
+                            for (let i = 0; i < spans.length; i++) {
+                                const span = spans[i];
+                                // Adjust index because we sliced the first point of subsequent sections
+                                const adjStartIdx = sectionIdx > 0 ? (sectionStartIdx - 1) : sectionStartIdx;
+
+                                const startIdx = adjStartIdx + span.offset;
+                                const endIdx = adjStartIdx + ((i < spans.length - 1) ? spans[i + 1].offset : sectionCoords.length - 1);
+
+                                // Safety check for slice range
+                                if (startIdx >= endIdx) continue;
+
+                                const segmentCoords = allCoordinates.slice(startIdx, endIdx + 1);
+                                if (segmentCoords.length < 2) continue;
+
+                                let color = '#4285F4'; // Default Blue
+                                if (span.dynamicSpeedInfo) {
+                                    const base = span.dynamicSpeedInfo.baseSpeed || 0;
+                                    const traffic = span.dynamicSpeedInfo.trafficSpeed || 0;
+                                    const ratio = base > 0 ? traffic / base : 1;
+
+                                    if (ratio < 0.50) color = '#ef4444'; // Red
+                                    else if (ratio < 0.85) color = '#eab308'; // Yellow
+                                }
+
+                                allSegments.push({ coordinates: segmentCoords, color: color });
+                            }
+                        } else {
+                            allSegments.push({ coordinates: sectionCoords, color: '#4285F4' });
+                        }
+                    });
+
+                    // --- Optimization: Merge consecutive segments with the same color ---
+                    const mergedSegments: HereRouteSegment[] = [];
+                    if (allSegments.length > 0) {
+                        let current = allSegments[0];
+                        for (let i = 1; i < allSegments.length; i++) {
+                            const next = allSegments[i];
+                            if (next.color === current.color) {
+                                // Merge: Append next coordinates (skip first point as it should match last point)
+                                current.coordinates = [...current.coordinates, ...next.coordinates.slice(1)];
+                            } else {
+                                mergedSegments.push(current);
+                                current = next;
+                            }
+                        }
+                        mergedSegments.push(current);
                     }
 
-                    if (spans.length > 0 && allCoordinates.length > 0) {
-                        for (let i = 0; i < spans.length; i++) {
-                            const span = spans[i];
-                            const startIdx = span.offset;
-                            // Ensure endIdx doesn't go out of bounds. 
-                            // If it's the last span, it goes to the end of coordinates.
-                            // If it's not the last span, it goes to the next span's offset.
-                            const endIdx = (i < spans.length - 1) ? spans[i + 1].offset : allCoordinates.length - 1;
-
-                            // Slice including endIdx? 
-                            // slice(start, end) excludes end. 
-                            // We want to connect segments, so we might overlap by 1 point.
-                            // Let's use slice(startIdx, endIdx + 1)
-
-                            const segmentCoords = allCoordinates.slice(startIdx, endIdx + 1);
-
-                            // Safety check
-                            if (segmentCoords.length < 2) continue;
-
-                            // Calculate Traffic Color
-                            let color = '#4285F4'; // Default Google Blue (Clear)
-
-                            if (span.dynamicSpeedInfo) {
-                                const trafficSpeed = span.dynamicSpeedInfo.trafficSpeed;
-                                const baseSpeed = span.dynamicSpeedInfo.baseSpeed;
-
-                                if (baseSpeed > 0) {
-                                    const ratio = trafficSpeed / baseSpeed;
-                                    // console.log(`Span Traffic: traffic=${trafficSpeed}, base=${baseSpeed}, ratio=${ratio.toFixed(2)}`);
-
-                                    // Standard Sensitivity
-                                    if (ratio < 0.50) {
-                                        color = '#ef4444'; // Red (Traffic)
-                                    } else if (ratio < 0.85) {
-                                        color = '#eab308'; // Yellow (Moderate)
-                                    }
-                                }
-                            }
-
-                            segments.push({
-                                coordinates: segmentCoords,
-                                color: color
-                            });
-                        }
-                    } else {
-                        console.log("No Spans Found in Response!");
-                        // If no spans returned, just use the whole line as one blue segment
-                        segments.push({
-                            coordinates: allCoordinates,
+                    // GAP FIX: Visual line from Origin to Start of Route
+                    if (origin && !isNaN(origin.latitude) && !isNaN(origin.longitude) && allCoordinates.length > 0) {
+                        mergedSegments.unshift({
+                            coordinates: [origin, allCoordinates[0]],
                             color: '#4285F4'
                         });
                     }
 
                     // GAP FIX: Visual line from End to Destination
-                    if (destination && allCoordinates.length > 0) {
-                        segments.push({
+                    if (destination && !isNaN(destination.latitude) && !isNaN(destination.longitude) && allCoordinates.length > 0) {
+                        mergedSegments.push({
                             coordinates: [allCoordinates[allCoordinates.length - 1], destination],
                             color: '#4285F4'
                         });
                     }
 
-                    console.log(`Calculated ${segments.length} traffic segments with gaps filled`);
+                    // Final Safety: Remove any segments with invalid data
+                    const finalSegments = mergedSegments.filter(s =>
+                        s.coordinates.length >= 2 &&
+                        s.coordinates.every(p => !isNaN(p.latitude) && !isNaN(p.longitude))
+                    );
 
                     return {
-                        coordinates: allCoordinates, // Keeping original for strict logic if needed
-                        segments: segments,
-                        distance,
-                        duration,
+                        coordinates: allCoordinates.filter(p => !isNaN(p.latitude) && !isNaN(p.longitude)),
+                        segments: finalSegments,
+                        distance: totalDistance,
+                        duration: totalDuration,
                         summary: `Route ${index + 1}`
                     };
                 });

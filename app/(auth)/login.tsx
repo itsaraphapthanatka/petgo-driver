@@ -8,6 +8,7 @@ import { AppButton } from '../../components/ui/AppButton';
 import { AppInput } from '../../components/ui/AppInput';
 import { Mail, Lock, Phone } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import { useSettingsStore } from '../../store/useSettingsStore';
 
 export default function LoginScreen() {
     const [username, setUsername] = useState('');
@@ -20,6 +21,7 @@ export default function LoginScreen() {
 
     const { loginWithPassword, loginWithOTP, isLoading, error, clearError, role } = useAuthStore();
     const { t } = useTranslation();
+    const { mapProvider } = useSettingsStore();
 
     const handlePasswordLogin = async () => {
         if (!username || !password) {
@@ -133,11 +135,16 @@ export default function LoginScreen() {
                             <Text className="text-primary font-bold">{t('login_screen.sign_up')}</Text>
                         </TouchableOpacity>
                     </View>
-
                     <View className="items-center mt-8 mb-4">
-                        <Text className="text-[10px] text-gray-400 font-medium">
+                        <Text className="text-[10px] text-gray-400 font-medium tracking-tight">
                             API: {process.env.EXPO_PUBLIC_API_BASE_URL}
                         </Text>
+                        <View className="flex-row items-center mt-1">
+                            <View className="w-1 h-1 rounded-full bg-green-400 mr-2" />
+                            <Text className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                                Map Provider: {mapProvider}
+                            </Text>
+                        </View>
                     </View>
 
                 </ScrollView>

@@ -1,5 +1,14 @@
 // Order types based on API schema at http://192.168.1.127:8000/openapi.json
 
+export interface OrderStop {
+    id?: number;
+    order_id?: number;
+    address: string;
+    lat: number;
+    lng: number;
+    order_index: number;
+}
+
 export interface UserOut {
     id: number;
     full_name: string;
@@ -56,6 +65,7 @@ export interface Order {
     created_at: string;
     pet: PetOut;
     pets: PetOut[]; // New array
+    stops: OrderStop[];
 }
 
 export interface OrderCreate {
@@ -78,4 +88,5 @@ export interface OrderCreate {
     payment_status?: string;
     payment_method?: string;
     stripe_payment_method_id?: string;
+    stops?: OrderStop[];
 }

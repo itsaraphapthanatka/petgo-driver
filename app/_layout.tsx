@@ -8,6 +8,7 @@ import { api } from '../services/api';
 import { View } from 'react-native';
 import { I18nextProvider } from 'react-i18next';
 import i18n from '../i18n';
+import { NotificationListener } from '../components/NotificationListener';
 
 let StripeProvider: any;
 try {
@@ -30,8 +31,8 @@ function RootLayout() {
         const syncSettings = async () => {
             try {
                 const settings = await api.getPricingSettings();
-                if (settings && (settings.map === 'google' || settings.map === 'here')) {
-                    setMapProvider(settings.map as 'google' | 'here');
+                if (settings && (settings.map === 'google' || settings.map === 'here' || settings.map === 'longdo')) {
+                    setMapProvider(settings.map as 'google' | 'here' | 'longdo');
                     console.log('Map provider synced:', settings.map);
                 }
             } catch (error) {
@@ -55,6 +56,8 @@ function RootLayout() {
         const inAuthGroup = segments[0] === '(auth)';
 
         if (isAuthenticated && inAuthGroup) {
+            const { registerForPushNotificationsAsync } = require('../services/notificationService');
+            registerForPushNotificationsAsync();
             router.replace('/(customer)/(tabs)/home');
         } else if (!isAuthenticated && !inAuthGroup) {
             // Redirect to login if token expired (mock)
@@ -71,6 +74,7 @@ function RootLayout() {
                 merchantIdentifier="merchant.com.pettransport" // optional
             >
                 <Slot />
+                <NotificationListener />
             </StripeProvider>
         </I18nextProvider>
     );

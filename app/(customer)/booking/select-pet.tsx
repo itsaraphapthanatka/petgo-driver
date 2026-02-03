@@ -33,7 +33,7 @@ export default function SelectPetScreen() {
                 setPetTypes(fetchedTypes);
             } catch (error) {
                 console.error('Error fetching pet data:', error);
-                Alert.alert('Error', 'Failed to load pet data');
+                Alert.alert(t('error'), 'Failed to load pet data');
             } finally {
                 setLoading(false);
             }
@@ -65,7 +65,7 @@ export default function SelectPetScreen() {
 
     const handleAddPet = async () => {
         if (!newPetName || !newPetWeight) {
-            Alert.alert('Error', 'Please fill in all fields');
+            Alert.alert(t('error'), 'Please fill in all fields');
             return;
         }
 
@@ -84,7 +84,7 @@ export default function SelectPetScreen() {
             setNewPetWeight('');
         } catch (error) {
             console.error('Error adding pet:', error);
-            Alert.alert('Error', 'Failed to add pet');
+            Alert.alert(t('error'), 'Failed to add pet');
         } finally {
             setAddingInProgress(false);
         }
@@ -235,7 +235,7 @@ export default function SelectPetScreen() {
 
             <View className="p-5 border-t border-gray-100">
                 <AppButton
-                    title="Next"
+                    title={t('next')}
                     disabled={selectedPets.length === 0}
                     onPress={() => {
                         const selectedPetsData = pets.filter(p => selectedPets.includes(p.id));

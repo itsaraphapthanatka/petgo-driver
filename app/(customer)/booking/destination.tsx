@@ -20,18 +20,17 @@ export default function DestinationScreen() {
                     const { status } = await Location.requestForegroundPermissionsAsync();
                     if (status === 'granted') {
                         const location = await Location.getCurrentPositionAsync({});
-                        // Reverse geocode basic fallback
-                        let address = 'Current Location';
+                        // Use Google reverse geocoding for better address
+                        let address = 'ตำแหน่งปัจจุบัน';
                         try {
-                            const geocode = await Location.reverseGeocodeAsync({
-                                latitude: location.coords.latitude,
-                                longitude: location.coords.longitude
-                            });
-                            if (geocode.length > 0) {
-                                const item = geocode[0];
-                                address = [item.name, item.street, item.district].filter(Boolean).join(', ');
-                            }
-                        } catch (e) { }
+                            const { reverseGeocode } = await import('../../../services/geocodingService');
+                            address = await reverseGeocode(
+                                location.coords.latitude,
+                                location.coords.longitude
+                            );
+                        } catch (e) {
+                            console.warn('Reverse geocoding failed, using fallback', e);
+                        }
 
                         setPickupLocation({
                             name: address,

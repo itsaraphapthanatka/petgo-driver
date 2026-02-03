@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, Dimensions, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView from 'react-native-maps';
+import { AppMapView } from '../../../components/AppMapView';
 import { ArrowLeft, MapPin } from 'lucide-react-native';
 import { Order } from '../../../types/order';
 import { orderService } from '../../../services/orderService';
@@ -147,7 +149,7 @@ export default function JobPreviewScreen() {
     return (
         <View className="flex-1 bg-white">
             {/* Map */}
-            <MapView
+            <AppMapView
                 ref={mapRef}
                 style={{ flex: 1 }}
                 provider={PROVIDER_GOOGLE}
@@ -187,7 +189,7 @@ export default function JobPreviewScreen() {
                         <View className="w-3 h-3 bg-red-500 rounded-full" />
                     </View>
                 </Marker>
-            </MapView>
+            </AppMapView>
 
             {/* Back Button */}
             <TouchableOpacity

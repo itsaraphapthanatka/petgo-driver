@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { Users, Car, TrendingUp, LogOut, Map as MapIcon } from 'lucide-react-native';
 import { AppButton } from '../../components/ui/AppButton';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { api } from '../../services/api';
 
 const STATS = [
     { title: "Total Users", value: "1,240", icon: <Users size={24} color="#2962FF" />, bg: "bg-blue-100" },
@@ -16,6 +17,16 @@ const STATS = [
 export default function AdminDashboard() {
     const { logout } = useAuthStore();
     const { mapProvider, setMapProvider } = useSettingsStore();
+
+    const handleSetMap = async (provider: 'google' | 'here' | 'longdo') => {
+        try {
+            await api.updatePricingSettings({ map: provider });
+            setMapProvider(provider);
+            alert(`Map provider switched to ${provider.toUpperCase()}`);
+        } catch (error) {
+            alert('Failed to update map settings');
+        }
+    };
 
     return (
         <SafeAreaView className="flex-1 bg-gray-50">
@@ -39,15 +50,21 @@ export default function AdminDashboard() {
                     <View className="flex-row bg-gray-100 p-1 rounded-lg">
                         <TouchableOpacity
                             className={`flex-1 py-2 items-center rounded-md ${mapProvider === 'google' ? 'bg-white shadow-sm' : ''}`}
-                            onPress={() => setMapProvider('google')}
+                            onPress={() => handleSetMap('google')}
                         >
-                            <Text className={`font-medium ${mapProvider === 'google' ? 'text-blue-600' : 'text-gray-500'}`}>Google Maps</Text>
+                            <Text className={`font-medium ${mapProvider === 'google' ? 'text-blue-600' : 'text-gray-500'}`}>Google</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             className={`flex-1 py-2 items-center rounded-md ${mapProvider === 'here' ? 'bg-white shadow-sm' : ''}`}
-                            onPress={() => setMapProvider('here')}
+                            onPress={() => handleSetMap('here')}
                         >
-                            <Text className={`font-medium ${mapProvider === 'here' ? 'text-blue-600' : 'text-gray-500'}`}>HERE Maps</Text>
+                            <Text className={`font-medium ${mapProvider === 'here' ? 'text-blue-600' : 'text-gray-500'}`}>HERE</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            className={`flex-1 py-2 items-center rounded-md ${mapProvider === 'longdo' ? 'bg-white shadow-sm' : ''}`}
+                            onPress={() => handleSetMap('longdo')}
+                        >
+                            <Text className={`font-medium ${mapProvider === 'longdo' ? 'text-blue-600' : 'text-gray-500'}`}>Longdo</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

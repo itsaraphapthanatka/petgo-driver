@@ -2,7 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Platform, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, Polyline, PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps';
+import { Marker, Polyline, PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView from 'react-native-maps';
 import { PetGoCarIcon } from '../../../components/icons/PetGoCarIcon';
 
 
@@ -36,7 +37,13 @@ export default function CustomerHome() {
     const [driverLocations, setDriverLocations] = React.useState<DriverLocation[]>([]);
 
     // Booking Store
-    const { setDropoffLocation, setPickupLocation, pickupLocation, dropoffLocation } = useBookingStore();
+    const {
+        setDropoffLocation,
+        setPickupLocation,
+        pickupLocation,
+        dropoffLocation,
+        stops
+    } = useBookingStore();
 
     const [routeCoordinates, setRouteCoordinates] = React.useState<LatLng[]>([]);
     const [routeSegments, setRouteSegments] = React.useState<HereRouteSegment[]>([]);
@@ -94,14 +101,21 @@ export default function CustomerHome() {
             const { status } = await Location.getForegroundPermissionsAsync();
             if (status === 'granted' && !pickupLocation) {
                 const location = await Location.getCurrentPositionAsync({});
-                const initialName = t('current_location');
+
+                // Use reverse geocoding to get actual address
+                const { reverseGeocode } = await import('../../../services/geocodingService');
+                const address = await reverseGeocode(
+                    location.coords.latitude,
+                    location.coords.longitude
+                );
+
                 setPickupLocation({
-                    name: initialName,
-                    address: 'Current Location',
+                    name: address,
+                    address: address,
                     latitude: location.coords.latitude,
                     longitude: location.coords.longitude
                 });
-                setPickupQuery(initialName);
+                setPickupQuery(address);
             }
         })();
     }, [user?.id]); // Add user?.id dependency
@@ -159,20 +173,25 @@ export default function CustomerHome() {
                 const origin: LatLng = { latitude: pickupLocation.latitude, longitude: pickupLocation.longitude };
                 const destination: LatLng = { latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude };
 
+                // Extract coordinates from stops
+                const stopCoords: LatLng[] = stops.map(s => ({ latitude: s.latitude, longitude: s.longitude }));
+
                 // Use getHereRoute as it seems simpler for A to B, or getRoutes
                 // Force traffic mode: 'car' usually implies traffic consideration in HERE API if not disabled
-                const routes = await hereMapApi.getRoutes(origin, destination, 'car', HERE_MAPS_API_KEY);
+                const routes = await hereMapApi.getRoutes(origin, destination, stopCoords, 'car', HERE_MAPS_API_KEY);
 
 
-                if (routes.length > 0) {
+                if (routes.length > 0 && routes[0].coordinates && routes[0].coordinates.length > 0) {
                     setRouteCoordinates(routes[0].coordinates);
                     setRouteSegments(routes[0].segments);
 
                     // Fit map to route
-                    mapRef.current?.fitToCoordinates(routes[0].coordinates, {
-                        edgePadding: { top: 100, right: 50, bottom: 400, left: 50 },
-                        animated: true
-                    });
+                    if (mapRef.current) {
+                        mapRef.current.fitToCoordinates(routes[0].coordinates, {
+                            edgePadding: { top: 100, right: 50, bottom: 400, left: 50 },
+                            animated: true
+                        });
+                    }
                 }
             } else {
                 setRouteCoordinates([]);
@@ -180,7 +199,7 @@ export default function CustomerHome() {
             }
         };
         fetchRoute();
-    }, [pickupLocation, dropoffLocation]);
+    }, [pickupLocation, dropoffLocation, stops]);
 
 
     const handleSelectLocation = (item: SearchResult) => {
@@ -296,44 +315,7 @@ export default function CustomerHome() {
 
     return (
         <View className="flex-1 bg-white">
-            {/* <AppMapView
-                ref={mapRef}
-                style={StyleSheet.absoluteFillObject}
-                initialRegion={{
-                    latitude: 13.7563,
-                    longitude: 100.5018,
-                    latitudeDelta: 0.05,
-                    longitudeDelta: 0.05,
-                }}
-                showsUserLocation={true}
-                showsMyLocationButton={true}
-            >
-                <Marker coordinate={{ latitude: 13.7563, longitude: 100.5018 }}>
-                    <View className="bg-white p-1.5 rounded-full border border-green-500 shadow-sm">
-                        <Car size={16} color="black" />
-                    </View>
-                </Marker>
-            </AppMapView> */}
-            {/* <MapView
-                ref={mapRef}
-                style={{ flex: 1 }}
-                provider={PROVIDER_DEFAULT}
-                initialRegion={{
-                    latitude: 13.7563,
-                    longitude: 100.5018,
-                    latitudeDelta: 0.05,
-                    longitudeDelta: 0.05,
-                }}
-                showsUserLocation={true}
-                showsMyLocationButton={true}
-            >
-                <Marker coordinate={{ latitude: 13.7563, longitude: 100.5018 }}>
-                    <View className="bg-white p-1.5 rounded-full border border-green-500 shadow-sm">
-                        <Car size={16} color="black" />
-                    </View>
-                </Marker>
-            </MapView> */}
-            <MapView
+            <AppMapView
                 ref={mapRef}
                 provider={PROVIDER_GOOGLE}
                 style={{ flex: 1 }}
@@ -345,7 +327,7 @@ export default function CustomerHome() {
                 {pickupLocation && (
                     <Marker
                         coordinate={{ latitude: pickupLocation.latitude, longitude: pickupLocation.longitude }}
-                        title={t('ตำแหน่งของคุณ') || 'Pickup'}
+                        title={t('pickup')}
                         anchor={{ x: 0.5, y: 0.5 }}
                     >
                         <View className="bg-blue-500 p-1.5 rounded-full border border-white shadow-sm">
@@ -358,7 +340,7 @@ export default function CustomerHome() {
                 {dropoffLocation && (
                     <Marker
                         coordinate={{ latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude }}
-                        title={t('สถานที่ปลายทาง') || 'Dropoff'}
+                        title={t('drop_off')}
                         anchor={{ x: 0.5, y: 0.5 }}
                     >
                         <View className="bg-red-500 p-1.5 rounded-full border border-white shadow-sm">
@@ -366,6 +348,20 @@ export default function CustomerHome() {
                         </View>
                     </Marker>
                 )}
+
+                {/* Stops Markers */}
+                {stops.map((stop, index) => (
+                    <Marker
+                        key={`stop-${index}`}
+                        coordinate={{ latitude: stop.latitude, longitude: stop.longitude }}
+                        title={stop.name || `Stop ${index + 1}`}
+                        anchor={{ x: 0.5, y: 0.5 }}
+                    >
+                        <View className="bg-orange-500 p-1.5 rounded-full border border-white shadow-sm">
+                            <MapPin size={16} color="white" />
+                        </View>
+                    </Marker>
+                ))}
 
                 {/* Route Rendering: Single Layer Traffic Segments */}
                 {/* User requested "Do it on the destination line", implying no separate border/casing */}
@@ -408,11 +404,11 @@ export default function CustomerHome() {
                         title={driver.driver?.user?.full_name || "Driver"}
                         anchor={{ x: 0.5, y: 0.5 }}
                     >
-                        <PetGoCarIcon width={40} height={40} />
+                        <PetGoCarIcon width={24} height={48} />
                     </Marker>
                 ))}
 
-            </MapView>
+            </AppMapView>
 
             <SafeAreaView className="absolute top-0 w-full px-5 pt-12 flex-row justify-between items-center z-10">
                 <View className="flex-row items-center bg-white/90 p-2 pr-4 rounded-full shadow-md backdrop-blur-md">

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "petgo",
+    "name": "PetGo",
     "slug": "petgo",
     "owner": "realsung6",
     "scheme": "petgo",
@@ -17,11 +17,15 @@
     "ios": {
       "supportsTablet": true,
       "config": {
-        "googleMapsApiKey": "AIzaSyDKQzAl_-qFOsxqp4Wq2aobo41GyGjtEw0"
+        "googleMapsApiKey": "AIzaSyDnGZEQN5YUH1LFOTw1UzriihB_VbqzlAQ"
       },
       "bundleIdentifier": "com.petgo.petgo",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": [
+          "tel",
+          "sms"
+        ]
       }
     },
     "android": {
@@ -33,10 +37,11 @@
       "predictiveBackGestureEnabled": false,
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyDKQzAl_-qFOsxqp4Wq2aobo41GyGjtEw0"
+          "apiKey": "AIzaSyDnGZEQN5YUH1LFOTw1UzriihB_VbqzlAQ"
         }
       },
       "package": "com.petgo.petgo",
+      "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true
     },
     "web": {

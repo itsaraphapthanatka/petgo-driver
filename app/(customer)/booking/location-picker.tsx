@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, Image, TextInput, FlatList, Keyboard, TouchableWithoutFeedback } from 'react-native';
-import MapView, { Region, PROVIDER_GOOGLE } from 'react-native-maps';
+import { Region, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView from 'react-native-maps';
+import { AppMapView } from '../../../components/AppMapView';
 import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useBookingStore } from '../../../store/useBookingStore';
@@ -13,7 +15,7 @@ import debounce from 'lodash/debounce';
 export default function LocationPickerScreen() {
     const { t } = useTranslation();
     const params = useLocalSearchParams();
-    const mode = params.mode as 'pickup' | 'dropoff';
+    const mode = params.mode as string;
 
     const mapRef = useRef<MapView>(null);
     const [region, setRegion] = useState<Region>({
@@ -33,48 +35,15 @@ export default function LocationPickerScreen() {
     const [isSearching, setIsSearching] = useState(false);
     const LONGDO_API_KEY = process.env.EXPO_PUBLIC_LONGDO_MAP_API_KEY || '';
 
-    const { setPickupLocation, setDropoffLocation, pickupLocation, dropoffLocation } = useBookingStore();
-
-    // Initialize map position
-    useEffect(() => {
-        (async () => {
-            let startLat = 13.7563;
-            let startLng = 100.5018;
-
-            // 1. Try to use existing store location if available
-            if (mode === 'pickup' && pickupLocation) {
-                startLat = pickupLocation.latitude;
-                startLng = pickupLocation.longitude;
-            } else if (mode === 'dropoff' && dropoffLocation) {
-                startLat = dropoffLocation.latitude;
-                startLng = dropoffLocation.longitude;
-            }
-            // 2. If no store location, try current location for pickup (or both)
-            else {
-                try {
-                    const { status } = await Location.requestForegroundPermissionsAsync();
-                    if (status === 'granted') {
-                        const location = await Location.getCurrentPositionAsync({});
-                        startLat = location.coords.latitude;
-                        startLng = location.coords.longitude;
-                    }
-                } catch (e) {
-                    console.warn("Could not get current location", e);
-                }
-            }
-
-            setRegion({
-                latitude: startLat,
-                longitude: startLng,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-            });
-            setInitialLocationSet(true);
-
-            // Initial Reverse Geocode
-            fetchAddress(startLat, startLng);
-        })();
-    }, []);
+    const {
+        setPickupLocation,
+        setDropoffLocation,
+        pickupLocation,
+        dropoffLocation,
+        stops,
+        addStop,
+        updateStop
+    } = useBookingStore();
 
     const fetchAddress = async (latitude: number, longitude: number) => {
         setLoadingAddress(true);
@@ -107,6 +76,53 @@ export default function LocationPickerScreen() {
         fetchAddress(newRegion.latitude, newRegion.longitude);
     };
 
+    // Initialize map position
+    useEffect(() => {
+        (async () => {
+            let startLat = 13.7563;
+            let startLng = 100.5018;
+
+            // 1. Try to use existing store location if available
+            if (mode === 'pickup' && pickupLocation) {
+                startLat = pickupLocation.latitude;
+                startLng = pickupLocation.longitude;
+            } else if (mode === 'dropoff' && dropoffLocation) {
+                startLat = dropoffLocation.latitude;
+                startLng = dropoffLocation.longitude;
+            } else if (mode.startsWith('stop_')) {
+                const index = parseInt(mode.split('_')[1]);
+                if (stops[index]) {
+                    startLat = stops[index].latitude;
+                    startLng = stops[index].longitude;
+                }
+            }
+            // 2. If no store location, try current location (default behavior)
+            else {
+                try {
+                    const { status } = await Location.requestForegroundPermissionsAsync();
+                    if (status === 'granted') {
+                        const location = await Location.getCurrentPositionAsync({});
+                        startLat = location.coords.latitude;
+                        startLng = location.coords.longitude;
+                    }
+                } catch (e) {
+                    console.warn("Could not get current location", e);
+                }
+            }
+
+            setRegion({
+                latitude: startLat,
+                longitude: startLng,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+            });
+            setInitialLocationSet(true);
+
+            // Initial Reverse Geocode
+            fetchAddress(startLat, startLng);
+        })();
+    }, []);
+
     const handleConfirm = () => {
         const locationData = {
             name: address.split(',')[0], // Simple name extraction
@@ -117,8 +133,13 @@ export default function LocationPickerScreen() {
 
         if (mode === 'pickup') {
             setPickupLocation(locationData);
-        } else {
+        } else if (mode === 'dropoff') {
             setDropoffLocation(locationData);
+        } else if (mode === 'add_stop') {
+            addStop(locationData);
+        } else if (mode.startsWith('stop_')) {
+            const index = parseInt(mode.split('_')[1]);
+            updateStop(index, locationData);
         }
         router.back();
     };
@@ -177,6 +198,11 @@ export default function LocationPickerScreen() {
         setSearchQuery('');
         setSearchResults([]);
 
+        if (isNaN(item.latitude) || isNaN(item.longitude)) {
+            console.warn("Invalid search result coordinates", item);
+            return;
+        }
+
         const newRegion = {
             latitude: item.latitude,
             longitude: item.longitude,
@@ -184,7 +210,9 @@ export default function LocationPickerScreen() {
             longitudeDelta: 0.01,
         };
 
-        mapRef.current?.animateToRegion(newRegion);
+        if (mapRef.current) {
+            mapRef.current.animateToRegion(newRegion);
+        }
         setRegion(newRegion);
         // fetchAddress will be triggered by onRegionChangeComplete
         // but we can also set the address immediately to the search result name for better UX
@@ -207,7 +235,7 @@ export default function LocationPickerScreen() {
 
     return (
         <View className="flex-1 bg-white">
-            <MapView
+            <AppMapView
                 ref={mapRef}
                 style={{ flex: 1 }}
                 provider={PROVIDER_GOOGLE}
@@ -215,7 +243,7 @@ export default function LocationPickerScreen() {
                 onRegionChangeComplete={handleRegionChangeComplete}
                 onPanDrag={() => Keyboard.dismiss()}
             >
-            </MapView>
+            </AppMapView>
 
             {/* Fixed Center Pin */}
             <View className="absolute top-0 left-0 right-0 bottom-0 justify-center items-center pointer-events-none" pointerEvents="none">

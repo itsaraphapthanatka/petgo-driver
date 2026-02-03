@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "657902739428",
+    "project_id": "petgo-6180c",
+    "storage_bucket": "petgo-6180c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:657902739428:android:2996747420bb61e6f971f1",
+        "android_client_info": {
+          "package_name": "com.petgo.petgo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDnGZEQN5YUH1LFOTw1UzriihB_VbqzlAQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

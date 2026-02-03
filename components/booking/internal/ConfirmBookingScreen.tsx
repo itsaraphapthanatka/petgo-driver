@@ -3,12 +3,13 @@ import { useEstimatePrice } from "./hooks/useEstimatePrice";
 import { BookingBottomSheet } from "./components/BookingBottomSheet";
 import { RouteSelector } from "./components/RouteSelector";
 import { VehicleSelector } from "./components/VehicleSelector";
-import { BookingMap } from "./components/BookingMap";
 import { useBookingStore } from "../../../store/useBookingStore";
 import { useLocalSearchParams } from "expo-router";
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { View } from "react-native";
-import MapView from "react-native-maps";
+import { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView from 'react-native-maps';
+import { AppMapView } from '../../AppMapView';
 import { MOCK_RIDE_OPTIONS } from "../../../utils/mockData";
 import { api } from "../../../services/api";
 
@@ -30,18 +31,63 @@ export default function ConfirmBookingScreen() {
         petWeight: Number(petWeight),
     });
 
+    const initialRegion = {
+        latitude: pickupLocation?.latitude ?? 0,
+        longitude: pickupLocation?.longitude ?? 0,
+        latitudeDelta: 0.1,
+        longitudeDelta: 0.1,
+    };
+
+    const handleMapReady = useCallback(() => {
+        if (mapRef.current && pickupLocation && dropoffLocation) {
+            mapRef.current.fitToCoordinates(
+                [
+                    { latitude: pickupLocation.latitude, longitude: pickupLocation.longitude },
+                    { latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude },
+                ],
+                {
+                    edgePadding: { top: 100, right: 50, bottom: 300, left: 50 },
+                    animated: true,
+                }
+            );
+        }
+    }, [pickupLocation, dropoffLocation]);
+
     return (
         <View className="flex-1">
-            <BookingMap
+            <AppMapView
                 ref={mapRef}
-                initialRegion={{
-                    latitude: pickupLocation?.latitude ?? 0,
-                    longitude: pickupLocation?.longitude ?? 0,
-                    latitudeDelta: 0.1,
-                    longitudeDelta: 0.1,
-                }}
-                route={selectedRoute}
-            />
+                style={{ flex: 1 }}
+                provider={PROVIDER_GOOGLE}
+                initialRegion={initialRegion}
+                onMapReady={handleMapReady}
+            >
+                {pickupLocation && (
+                    <Marker
+                        coordinate={{
+                            latitude: pickupLocation.latitude,
+                            longitude: pickupLocation.longitude,
+                        }}
+                        title="Pickup Location"
+                    />
+                )}
+                {dropoffLocation && (
+                    <Marker
+                        coordinate={{
+                            latitude: dropoffLocation.latitude,
+                            longitude: dropoffLocation.longitude,
+                        }}
+                        title="Dropoff Location"
+                    />
+                )}
+                {selectedRoute && (
+                    <Polyline
+                        coordinates={selectedRoute.coordinates}
+                        strokeWidth={4}
+                        strokeColor="blue"
+                    />
+                )}
+            </AppMapView>
 
             <BookingBottomSheet
                 distance={selectedRoute?.distance / 1000 || 0}

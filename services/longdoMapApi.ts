@@ -32,13 +32,20 @@ export const longdoMapApi = {
             const data = await response.json();
 
             if (data && data.data) {
-                return data.data.map((item: any, index: number) => ({
-                    id: item.id || `${index}`,
-                    name: item.name || item.title || '',
-                    address: item.address || '',
-                    latitude: parseFloat(item.lat),
-                    longitude: parseFloat(item.lon)
-                }));
+                return data.data.map((item: any, index: number) => {
+                    const lat = parseFloat(item.lat);
+                    const lon = parseFloat(item.lon);
+
+                    if (isNaN(lat) || isNaN(lon)) return null;
+
+                    return {
+                        id: item.id || `${index}`,
+                        name: item.name || item.title || '',
+                        address: item.address || '',
+                        latitude: lat,
+                        longitude: lon
+                    };
+                }).filter((item: any) => item !== null);
             }
 
             return [];

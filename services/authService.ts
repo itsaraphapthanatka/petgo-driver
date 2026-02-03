@@ -148,20 +148,49 @@ export const authService = {
      */
     async verifyOTP(phoneNumber: string, otp: string): Promise<AuthResponse> {
         try {
-            const response = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+            const url = `${API_BASE_URL}/auth/verify-otp`;
+            const body = { phone_number: phoneNumber, otp };
+
+            console.log(`[authService] Verifying OTP at: ${url}`);
+            console.log(`[authService] Request body:`, body);
+
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ phone_number: phoneNumber, otp }),
+                body: JSON.stringify(body),
             });
 
+            console.log(`[authService] Response status: ${response.status}`);
+            console.log(`[authService] Response headers:`, response.headers);
+
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'OTP verification failed');
+                let errorMessage = 'OTP verification failed';
+                try {
+                    const error = await response.json();
+                    console.log(`[authService] Error response (JSON):`, error);
+                    errorMessage = error.detail || errorMessage;
+                } catch {
+                    // If response is not JSON, try to get text
+                    const text = await response.text();
+                    console.log(`[authService] Error response (text):`, text);
+                    errorMessage = text || errorMessage;
+                }
+                throw new Error(errorMessage);
             }
 
-            const data: AuthResponse = await response.json();
+            const responseText = await response.text();
+            console.log(`[authService] Success response (raw):`, responseText);
+
+            let data: AuthResponse;
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error(`[authService] Failed to parse response:`, parseError);
+                console.error(`[authService] Raw response was:`, responseText.substring(0, 200));
+                throw new Error('Server returned invalid response');
+            }
 
             // Store token
             await tokenManager.setToken(data.access_token);

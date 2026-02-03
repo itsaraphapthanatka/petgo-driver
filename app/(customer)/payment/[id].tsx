@@ -41,8 +41,10 @@ function CustomerPaymentScreen() {
             } catch (e) {
                 console.warn("No payment record found");
             }
+            return fetchedOrder;
         } catch (error) {
             console.error("Failed to fetch order for payment:", error);
+            return null;
         } finally {
             setIsLoading(false);
         }
@@ -56,10 +58,10 @@ function CustomerPaymentScreen() {
         setIsProcessing(true);
         try {
             await orderService.payWithWallet(Number(id));
-            Alert.alert("Success", "Payment successful using Wallet!");
+            Alert.alert("สำเร็จ", "ชำระเงินผ่านวอลเล็ทเรียบร้อยแล้ว!");
             fetchData();
         } catch (error: any) {
-            Alert.alert("Error", error.message || "Failed to pay with wallet");
+            Alert.alert("ข้อผิดพลาด", error.message || "การชำระเงินผ่านวอลเล็ทล้มเหลว");
         } finally {
             setIsProcessing(false);
         }
@@ -68,11 +70,12 @@ function CustomerPaymentScreen() {
     const handleCheckStatus = async () => {
         setIsProcessing(true);
         try {
-            await fetchData();
-            if (order?.payment_status === 'paid') {
-                Alert.alert("Success", "Payment confirmed!");
+            await api.syncPayment(Number(id));
+            const updatedOrder = await fetchData();
+            if (updatedOrder?.payment_status === 'paid') {
+                // Success - UI will update automatically
             } else {
-                Alert.alert("Pending", "Payment not yet confirmed. Please try again in a moment.");
+                Alert.alert("รอการยืนยัน", "ยังไม่พบยอดชำระเงิน กรุณาลองใหม่อีกครั้ง");
             }
         } finally {
             setIsProcessing(false);
@@ -109,7 +112,7 @@ function CustomerPaymentScreen() {
             });
 
             if (initError) {
-                Alert.alert('Error', initError.message);
+                Alert.alert('ข้อผิดพลาด', initError.message);
                 setIsProcessing(false);
                 return;
             }
@@ -120,7 +123,7 @@ function CustomerPaymentScreen() {
             if (presentError) {
                 // If user cancels, we don't need to show an error unless it's a real failure
                 if (presentError.code !== 'Canceled') {
-                    Alert.alert('Error', presentError.message);
+                    Alert.alert('ข้อผิดพลาด', presentError.message);
                 }
                 setIsProcessing(false);
             } else {
@@ -131,7 +134,7 @@ function CustomerPaymentScreen() {
                     if (currentPayment) {
                         await api.verifyPayment(currentPayment.id, 'successful');
                     }
-                    Alert.alert('Success', 'Payment successful!');
+                    Alert.alert('สำเร็จ', 'ชำระเงินเรียบร้อยแล้ว!');
                     fetchData();
                 } catch (err) {
                     console.error("Verification error:", err);
@@ -140,7 +143,7 @@ function CustomerPaymentScreen() {
                 }
             }
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Payment initiation failed');
+            Alert.alert('ข้อผิดพลาด', error.message || 'เริ่มการชำระเงินล้มเหลว');
         } finally {
             setIsProcessing(false);
         }
@@ -158,7 +161,7 @@ function CustomerPaymentScreen() {
                     try {
                         const result = await api.chargeSavedCard(order.id, order.stripe_payment_method_id);
                         if (result.status === 'success') {
-                            Alert.alert("Success", "Payment successful!");
+                            Alert.alert("สำเร็จ", "ชำระเงินเรียบร้อยแล้ว!");
                             fetchData();
                             return;
                         } else {
@@ -206,7 +209,8 @@ function CustomerPaymentScreen() {
     useEffect(() => {
         let interval: any;
         if (order && order.payment_method === 'promptpay' && order.payment_status !== 'paid') {
-            interval = setInterval(() => {
+            interval = setInterval(async () => {
+                await api.syncPayment(order.id);
                 fetchData();
             }, 5000);
         }
@@ -226,8 +230,8 @@ function CustomerPaymentScreen() {
     if (!order) {
         return (
             <View className="flex-1 bg-white items-center justify-center p-6">
-                <Text className="text-lg font-bold">Order not found</Text>
-                <AppButton title="Go Home" onPress={() => router.replace('/(customer)/(tabs)/home')} className="mt-4" />
+                <Text className="text-lg font-bold">ไม่พบรายการ (Order not found)</Text>
+                <AppButton title="กลับหน้าหลัก" onPress={() => router.replace('/(customer)/(tabs)/home')} className="mt-4" />
             </View>
         );
     }
