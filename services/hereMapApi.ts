@@ -149,10 +149,7 @@ export const hereMapApi = {
             const originStr = `${origin.latitude},${origin.longitude}`;
             const destStr = `${destination.latitude},${destination.longitude}`;
 
-<<<<<<< HEAD
             // Construct via parameters for stops
-=======
->>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
             let viaParams = "";
             if (stops && stops.length > 0) {
                 stops.forEach(stop => {
@@ -160,11 +157,8 @@ export const hereMapApi = {
                 });
             }
 
-<<<<<<< HEAD
             // Request routes from HERE API with specific mode and traffic spans
             // Ensure spans=dynamicSpeedInfo,length is included!
-=======
->>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
             const url = `${HERE_ROUTING_API_URL}?transportMode=${mode}&origin=${originStr}&destination=${destStr}${viaParams}&return=polyline,summary&spans=dynamicSpeedInfo,length&apiKey=${apiKey}`;
 
             console.log("Fetching HERE Routes with Traffic:", url);
@@ -192,11 +186,7 @@ export const hereMapApi = {
 
                         const sectionStartIdx = allCoordinates.length;
 
-<<<<<<< HEAD
                         // Avoid double points at waypoints (waypoints are last of section N and first of section N+1)
-=======
-                        // Avoid double points
->>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
                         if (sectionIdx > 0 && allCoordinates.length > 0) {
                             allCoordinates = [...allCoordinates, ...sectionCoords.slice(1)];
                         } else {
@@ -211,41 +201,26 @@ export const hereMapApi = {
                         if (spans.length > 0) {
                             for (let i = 0; i < spans.length; i++) {
                                 const span = spans[i];
-<<<<<<< HEAD
                                 // Adjust index because we sliced the first point of subsequent sections
-=======
->>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
                                 const adjStartIdx = sectionIdx > 0 ? (sectionStartIdx - 1) : sectionStartIdx;
 
                                 const startIdx = adjStartIdx + span.offset;
                                 const endIdx = adjStartIdx + ((i < spans.length - 1) ? spans[i + 1].offset : sectionCoords.length - 1);
 
-<<<<<<< HEAD
                                 // Safety check for slice range
-=======
->>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
                                 if (startIdx >= endIdx) continue;
 
                                 const segmentCoords = allCoordinates.slice(startIdx, endIdx + 1);
                                 if (segmentCoords.length < 2) continue;
 
-<<<<<<< HEAD
                                 let color = '#4285F4'; // Default Blue
-=======
-                                let color = '#4285F4';
->>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
                                 if (span.dynamicSpeedInfo) {
                                     const base = span.dynamicSpeedInfo.baseSpeed || 0;
                                     const traffic = span.dynamicSpeedInfo.trafficSpeed || 0;
                                     const ratio = base > 0 ? traffic / base : 1;
 
-<<<<<<< HEAD
                                     if (ratio < 0.50) color = '#ef4444'; // Red
                                     else if (ratio < 0.85) color = '#eab308'; // Yellow
-=======
-                                    if (ratio < 0.50) color = '#ef4444';
-                                    else if (ratio < 0.85) color = '#eab308';
->>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
                                 }
 
                                 allSegments.push({ coordinates: segmentCoords, color: color });
@@ -255,21 +230,14 @@ export const hereMapApi = {
                         }
                     });
 
-<<<<<<< HEAD
                     // --- Optimization: Merge consecutive segments with the same color ---
-=======
-                    // Merge consecutive segments
->>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
                     const mergedSegments: HereRouteSegment[] = [];
                     if (allSegments.length > 0) {
                         let current = allSegments[0];
                         for (let i = 1; i < allSegments.length; i++) {
                             const next = allSegments[i];
                             if (next.color === current.color) {
-<<<<<<< HEAD
                                 // Merge: Append next coordinates (skip first point as it should match last point)
-=======
->>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
                                 current.coordinates = [...current.coordinates, ...next.coordinates.slice(1)];
                             } else {
                                 mergedSegments.push(current);
@@ -279,22 +247,15 @@ export const hereMapApi = {
                         mergedSegments.push(current);
                     }
 
-<<<<<<< HEAD
                     // GAP FIX: Visual line from Origin to Start of Route
-=======
-                    // GAP FIX
->>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
                     if (origin && !isNaN(origin.latitude) && !isNaN(origin.longitude) && allCoordinates.length > 0) {
                         mergedSegments.unshift({
                             coordinates: [origin, allCoordinates[0]],
                             color: '#4285F4'
                         });
                     }
-<<<<<<< HEAD
 
                     // GAP FIX: Visual line from End to Destination
-=======
->>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
                     if (destination && !isNaN(destination.latitude) && !isNaN(destination.longitude) && allCoordinates.length > 0) {
                         mergedSegments.push({
                             coordinates: [allCoordinates[allCoordinates.length - 1], destination],
@@ -302,10 +263,7 @@ export const hereMapApi = {
                         });
                     }
 
-<<<<<<< HEAD
                     // Final Safety: Remove any segments with invalid data
-=======
->>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
                     const finalSegments = mergedSegments.filter(s =>
                         s.coordinates.length >= 2 &&
                         s.coordinates.every(p => !isNaN(p.latitude) && !isNaN(p.longitude))

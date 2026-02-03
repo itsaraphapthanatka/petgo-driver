@@ -238,7 +238,7 @@ export const orderService = {
         return response.json();
     },
 
-    getActiveOrder: async (userId: number): Promise<Order | null> => {
+    getActiveOrder: async (userId?: number): Promise<Order | null> => {
         try {
             // Fetch all orders for the user
             const orders = await orderService.getOrders();

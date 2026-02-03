@@ -111,7 +111,7 @@ export default function LoginScreen() {
                         </TouchableOpacity>
 
                         <AppButton
-                            title={t('login_screen.login_as_customer')}
+                            title={t('login_screen.login_as_driver')}
                             onPress={handlePasswordLogin}
                             isLoading={isLoading}
                         />

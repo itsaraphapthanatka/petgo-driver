@@ -528,11 +528,6 @@ export const api = {
         if (!response.ok) throw new Error('Failed to detach payment method');
         return response.json();
     },
-<<<<<<< HEAD
-=======
-
-
->>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
     chargeSavedCard: async (orderId: number, paymentMethodId: string): Promise<any> => {
         const headers = await getAuthHeaders();
         const response = await fetch(`${API_BASE_URL}/payments/charge-card?order_id=${orderId}&payment_method_id=${paymentMethodId}`, {
@@ -547,8 +542,6 @@ export const api = {
     },
 
     syncPayment: async (orderId: number): Promise<any> => {
-<<<<<<< HEAD
-=======
         const headers = await getAuthHeaders();
         const response = await fetch(`${API_BASE_URL}/payments/sync/${orderId}`, {
             method: 'POST',
@@ -563,16 +556,15 @@ export const api = {
     },
 
     updateDriverBank: async (bankData: { bank_name: string, bank_account_number: string, bank_account_name: string }): Promise<any> => {
->>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/payments/sync/${orderId}`, {
-            method: 'POST',
-            headers
+        const response = await fetch(`${API_BASE_URL}/drivers/bank`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify(bankData)
         });
         if (!response.ok) {
             const errorText = await response.text();
-            console.warn('Sync payment failed:', errorText);
-            return { status: 'failed' };
+            throw new Error(`Failed to update bank: ${errorText}`);
         }
         return response.json();
     }

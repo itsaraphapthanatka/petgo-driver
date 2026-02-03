@@ -58,7 +58,11 @@ function RootLayout() {
         if (isAuthenticated && inAuthGroup) {
             const { registerForPushNotificationsAsync } = require('../services/notificationService');
             registerForPushNotificationsAsync();
-            router.replace('/(customer)/(tabs)/home');
+            if (role === 'driver') {
+                router.replace('/(driver)/(tabs)/home');
+            } else {
+                router.replace('/(customer)/(tabs)/home');
+            }
         } else if (!isAuthenticated && !inAuthGroup) {
             // Redirect to login if token expired (mock)
             setTimeout(() => {
