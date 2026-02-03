@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import { Order } from '../../../types/order';
 import * as Location from 'expo-location';
 import { api } from '../../../services/api';
+<<<<<<< HEAD
 import { orderService } from '../../../services/orderService';
 import { formatPrice } from '../../../utils/format';
 
@@ -26,6 +27,7 @@ export default function DriverHomeScreen() {
 
     // Check if user is actually a driver
     React.useEffect(() => {
+<<<<<<< HEAD
         if (user && user.role !== 'driver') {
             Alert.alert(
                 "ข้อผิดพลาด - ไม่ใช่บัญชีคนขับ",

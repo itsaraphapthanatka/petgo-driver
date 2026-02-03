@@ -770,9 +770,30 @@ export default function ActiveJobScreen() {
                 <View className="absolute bottom-0 left-0 right-0 p-5 bg-white border-t border-gray-100 pb-20">
                     <AppButton
                         title={
+<<<<<<< HEAD
                             status === 'accepted' ? t('arrived_at_pickup') :
                                 status === 'arrived' ? t('start_traveling') :
                                     order.payment_status === 'paid' ? t('complete_job') : t('complete_collect_payment')
+=======
+<<<<<<< HEAD
+                            status === 'accepted' ? t('arrived_at_pickup') :
+                                status === 'arrived' ? t('start_traveling') :
+                                    order.payment_status === 'paid' ? t('complete_job') : t('complete_collect_payment')
+=======
+                            status === 'accepted' ? 'Arrived at Pickup' :
+                                status === 'arrived' ? 'Start traveling' :
+                                    (() => {
+                                        const sortedStops = [...(order.stops || [])].sort((a, b) => a.order_index - b.order_index);
+                                        const nextStop = sortedStops.find(s => s.status !== 'departed');
+                                        if (nextStop) {
+                                            return nextStop.status === 'pending'
+                                                ? `Arrived at Stop ${nextStop.order_index + 1}`
+                                                : `Departed from Stop ${nextStop.order_index + 1}`;
+                                        }
+                                        return order.payment_status === 'paid' ? 'Complete Job' : 'Complete & Collect Payment';
+                                    })()
+>>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
+>>>>>>> parent of 8d8231a (refactor: remove driver application frontend components and layouts.)
                         }
                         onPress={handleAction}
                         isLoading={isSubmitting}
