@@ -170,7 +170,12 @@ export default function ActiveJobScreen() {
             }
 
             if (origin && destination) {
-                const route = await hereMapApi.getHereRoute(origin, destination, HERE_API_KEY);
+                const route = await hereMapApi.getHereRoute(
+                    origin,
+                    destination,
+                    (status === 'in_progress' || status === 'picked_up') ? order.stops?.map(s => ({ latitude: s.lat, longitude: s.lng })) : [],
+                    HERE_API_KEY
+                );
                 setRouteCoordinates(route);
 
                 if (mapRef.current && route.length > 0) {
@@ -226,7 +231,13 @@ export default function ActiveJobScreen() {
         };
 
         fetchOrder(false); // Initial load
-        const interval = setInterval(() => fetchOrder(true), 5000); // Poll every 5 seconds
+        fetchOrder(false); // Initial load
+        const interval = setInterval(async () => {
+            if (activeJob?.payment_method === 'promptpay') {
+                await api.syncPayment(Number(id));
+            }
+            fetchOrder(true);
+        }, 5000); // Poll every 5 seconds
 
         return () => {
             isMounted = false;
@@ -281,33 +292,98 @@ export default function ActiveJobScreen() {
         return R * c; // in metres
     };
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     const handleAction = async () => {
-        if (!order) return;
+        if (!order || isSubmitting) return;
+
         try {
+            setIsSubmitting(true);
             if (status === 'accepted') {
                 if (!currentLocation) {
                     Alert.alert("Location Unknown", "Please wait for your GPS location to be updated.");
+                    setIsSubmitting(false);
                     return;
                 }
 
+                // Check distance to pickup
                 const dist = calculateDistance(
-                    currentLocation.latitude,
-                    currentLocation.longitude,
+                    currentLocation!.latitude,
+                    currentLocation!.longitude,
                     order.pickup_lat,
                     order.pickup_lng
                 );
 
+<<<<<<< HEAD
                 // if (dist > 200) {
                 //     Alert.alert("Check-in Failed", `You are too far from the pickup location (${dist.toFixed(0)}m). You must be within 200m.`);
                 //     return;
                 // }
+=======
+                if (dist > 200) {
+                    Alert.alert("Check-in Failed", `You are too far from the pickup location (${dist.toFixed(0)}m). You must be within 200m.`);
+                    setIsSubmitting(false);
+                    return;
+                }
+>>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
 
-                await orderService.updateOrderStatus(order.id, 'arrived');
+                const updatedOrder = await orderService.updateOrderStatus(order.id, 'arrived');
+                setOrder(updatedOrder);
                 setStatus('arrived');
             } else if (status === 'arrived') {
-                await orderService.updateOrderStatus(order.id, 'in_progress');
+                const updatedOrder = await orderService.updateOrderStatus(order.id, 'in_progress');
+                setOrder(updatedOrder);
                 setStatus('in_progress');
             } else if (status === 'picked_up' || status === 'in_progress') {
+                if (!currentLocation) {
+                    Alert.alert("Location Unknown", "Please wait for your GPS location to be updated.");
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                // Find current stop - SORT FIRST to be safe
+                const sortedStops = [...(order.stops || [])].sort((a, b) => a.order_index - b.order_index);
+                const nextStop = sortedStops.find(s => s.status !== 'departed');
+
+                if (nextStop) {
+                    const distToStop = calculateDistance(
+                        currentLocation!.latitude,
+                        currentLocation!.longitude,
+                        nextStop.lat,
+                        nextStop.lng
+                    );
+
+                    if (nextStop.status === 'pending') {
+                        if (distToStop > 200) {
+                            Alert.alert("Arrived Failed", `You are too far from stop ${nextStop.order_index + 1} (${distToStop.toFixed(0)}m).`);
+                            setIsSubmitting(false);
+                            return;
+                        }
+                        const updatedOrder = await orderService.updateStopStatus(order.id, nextStop.id, 'arrived');
+                        setOrder(updatedOrder);
+                    } else if (nextStop.status === 'arrived') {
+                        console.log(`Updating stop ${nextStop.id} to departed`);
+                        const updatedOrder = await orderService.updateStopStatus(order.id, nextStop.id, 'departed');
+                        setOrder(updatedOrder);
+                    }
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                // Final Dropoff logic
+                const distToDropoff = calculateDistance(
+                    currentLocation!.latitude,
+                    currentLocation!.longitude,
+                    order.dropoff_lat,
+                    order.dropoff_lng
+                );
+
+                if (distToDropoff > 200) {
+                    Alert.alert("Complete Failed", `You are too far from the drop-off location (${distToDropoff.toFixed(0)}m).`);
+                    setIsSubmitting(false);
+                    return;
+                }
+
                 if (order.payment_method === 'cash' && order.payment_status !== 'paid') {
                     // Force payment collection for cash
                     router.push(`/(driver)/payment-collect/${order.id}`);
@@ -315,11 +391,11 @@ export default function ActiveJobScreen() {
                 }
 
                 // For Stripe or Wallet, we mark as completed
-                await orderService.updateOrderStatus(order.id, 'completed');
+                const updatedOrder = await orderService.updateOrderStatus(order.id, 'completed');
                 setStatus('completed');
+                setOrder(updatedOrder);
 
                 if (order.payment_method === 'promptpay' && order.payment_status !== 'paid') {
-                    // Automatically show QR code after marking as completed for PromptPay
                     fetchQR();
                 } else if (order.payment_method === 'cash') {
                     router.replace(`/(driver)/payment-collect/${order.id}`);
@@ -331,7 +407,9 @@ export default function ActiveJobScreen() {
             }
         } catch (error) {
             console.error('Failed to update status:', error);
-            // Fallback status setting if needed, but usually better to let poll fix it
+            Alert.alert("Error", "Failed to update status. Please try again.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -362,18 +440,30 @@ export default function ActiveJobScreen() {
 
     const openGoogleMaps = () => {
         if (!order) return;
-        const lat = (status === 'accepted' || status === 'arrived') ? order.pickup_lat : order.dropoff_lat;
-        const lng = (status === 'accepted' || status === 'arrived') ? order.pickup_lng : order.dropoff_lng;
+
+        let targetLat = order.dropoff_lat;
+        let targetLng = order.dropoff_lng;
+
+        if (status === 'accepted' || status === 'arrived') {
+            targetLat = order.pickup_lat;
+            targetLng = order.pickup_lng;
+        } else if (status === 'in_progress') {
+            const nextStop = order.stops?.find(s => s.status !== 'departed');
+            if (nextStop) {
+                targetLat = nextStop.lat;
+                targetLng = nextStop.lng;
+            }
+        }
 
         const url = Platform.OS === 'ios'
-            ? `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`
-            : `google.navigation:q=${lat},${lng}`;
+            ? `comgooglemaps://?daddr=${targetLat},${targetLng}&directionsmode=driving`
+            : `google.navigation:q=${targetLat},${targetLng}`;
 
         Linking.canOpenURL(url).then(supported => {
             if (supported) {
                 Linking.openURL(url);
             } else {
-                Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
+                Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${targetLat},${targetLng}`);
             }
         });
     };
@@ -446,6 +536,18 @@ export default function ActiveJobScreen() {
                             <View className="w-2 h-2 bg-red-500 rounded-full" />
                         </View>
                     </Marker>
+                    {order.stops?.map((stop, index) => (
+                        <Marker
+                            key={`stop-${index}`}
+                            coordinate={{ latitude: stop.lat, longitude: stop.lng }}
+                            title={`Stop ${index + 1}`}
+                            anchor={{ x: 0.5, y: 1 }}
+                        >
+                            <View className="bg-white p-1 rounded-full border border-orange-400 shadow-sm">
+                                <View className="w-2 h-2 bg-orange-400 rounded-full" />
+                            </View>
+                        </Marker>
+                    ))}
                     {order.customer_lat && order.customer_lng && status !== 'in_progress' && status !== 'completed' && (
                         <Marker
                             coordinate={{ latitude: order.customer_lat, longitude: order.customer_lng }}
@@ -514,18 +616,39 @@ export default function ActiveJobScreen() {
 
                 <View className="flex-1 px-5 pt-2">
                     <ScrollView showsVerticalScrollIndicator={false}>
-                        <View className="flex-row justify-between items-center mb-6">
-                            <View>
-                                <Text className="text-gray-500 text-xs uppercase tracking-wider mb-1">
-                                    {(status === 'accepted' || status === 'arrived') ? 'Picking Up' : 'Dropping Off'}
-                                </Text>
-                                <Text className="text-xl font-bold text-gray-900" numberOfLines={1}>
-                                    {(status === 'accepted' || status === 'arrived') ? order.pickup_address : order.dropoff_address}
-                                </Text>
+                        <View className="mb-4">
+                            <View className="flex-row items-center mb-1">
+                                <View className="w-2 h-2 rounded-full bg-blue-500 mr-2" />
+                                <Text className="text-xs text-gray-400 uppercase font-bold">Pick up</Text>
                             </View>
-                            <View className="bg-green-100 px-3 py-1 rounded-full">
-                                <Text className="text-green-600 font-bold text-lg">฿{order.price ? formatPrice(order.price) : '-'}</Text>
+                            <Text className="text-gray-900 font-semibold" numberOfLines={2}>{order.pickup_address}</Text>
+                        </View>
+
+                        {([...(order.stops || [])].sort((a, b) => a.order_index - b.order_index)).map((stop, index) => (
+                            <View key={`stop-${index}`} className="mb-4">
+                                <View className="flex-row items-center justify-between mb-1">
+                                    <View className="flex-row items-center">
+                                        <View className={`w-2 h-2 rounded-full ${stop.status === 'departed' ? 'bg-gray-300' : 'bg-orange-400'} mr-2`} />
+                                        <Text className="text-xs text-gray-400 uppercase font-bold">Stop {index + 1}</Text>
+                                    </View>
+                                    {stop.status !== 'pending' && (
+                                        <View className={`${stop.status === 'arrived' ? 'bg-blue-100' : 'bg-gray-100'} px-2 py-0.5 rounded-full`}>
+                                            <Text className={`${stop.status === 'arrived' ? 'text-blue-600' : 'text-gray-500'} text-[10px] font-bold uppercase`}>
+                                                {stop.status}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                                <Text className={`text-gray-900 font-semibold ${stop.status === 'departed' ? 'opacity-50' : ''}`} numberOfLines={2}>{stop.address}</Text>
                             </View>
+                        ))}
+
+                        <View className="mb-6">
+                            <View className="flex-row items-center mb-1">
+                                <View className="w-2 h-2 rounded-full bg-red-500 mr-2" />
+                                <Text className="text-xs text-gray-400 uppercase font-bold">Drop off</Text>
+                            </View>
+                            <Text className="text-gray-900 font-semibold" numberOfLines={2}>{order.dropoff_address}</Text>
                         </View>
 
                         <View className="flex-row items-center justify-between border-t border-b border-gray-100 py-4 mb-4">
@@ -651,12 +774,28 @@ export default function ActiveJobScreen() {
                 <View className="absolute bottom-0 left-0 right-0 p-5 bg-white border-t border-gray-100 pb-20">
                     <AppButton
                         title={
+<<<<<<< HEAD
                             status === 'accepted' ? t('arrived_at_pickup') :
                                 status === 'arrived' ? t('start_traveling') :
                                     order.payment_status === 'paid' ? t('complete_job') : t('complete_collect_payment')
+=======
+                            status === 'accepted' ? 'Arrived at Pickup' :
+                                status === 'arrived' ? 'Start traveling' :
+                                    (() => {
+                                        const sortedStops = [...(order.stops || [])].sort((a, b) => a.order_index - b.order_index);
+                                        const nextStop = sortedStops.find(s => s.status !== 'departed');
+                                        if (nextStop) {
+                                            return nextStop.status === 'pending'
+                                                ? `Arrived at Stop ${nextStop.order_index + 1}`
+                                                : `Departed from Stop ${nextStop.order_index + 1}`;
+                                        }
+                                        return order.payment_status === 'paid' ? 'Complete Job' : 'Complete & Collect Payment';
+                                    })()
+>>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
                         }
                         onPress={handleAction}
-                        className={status === 'in_progress' ? 'bg-red-500' : 'bg-green-600'}
+                        isLoading={isSubmitting}
+                        className={status === 'in_progress' ? (order.stops?.some(s => s.status !== 'departed') ? 'bg-orange-500' : 'bg-red-500') : 'bg-green-600'}
                         size="lg"
                     />
                 </View>

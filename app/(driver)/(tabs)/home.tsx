@@ -13,14 +13,37 @@ import { api } from '../../../services/api';
 import { formatPrice } from '../../../utils/format';
 
 export default function DriverHomeScreen() {
+<<<<<<< HEAD
     const { t } = useTranslation();
     const { user } = useAuthStore();
+=======
+    const { user, role } = useAuthStore();
+>>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
     const { pendingJobs, isLoading, error, fetchPendingJobs, acceptJob, declineJob } = useJobStore();
     const [isOnline, setIsOnline] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [acceptingJobId, setAcceptingJobId] = useState<number | null>(null);
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const lastSentLocationRef = React.useRef<{ lat: number; lng: number } | null>(null);
+
+    // Check if user is actually a driver
+    React.useEffect(() => {
+        if (user && role !== 'driver') {
+            Alert.alert(
+                "ข้อผิดพลาด - ไม่ใช่บัญชีคนขับ",
+                `คุณกำลังเข้าแอปคนขับด้วยบัญชี${role === 'customer' ? 'ลูกค้า' : 'ผู้ใช้ทั่วไป'} กรุณาออกจากระบบและเข้าสู่ระบบด้วยบัญชีคนขับ`,
+                [
+                    {
+                        text: "ออกจากระบบ",
+                        onPress: () => {
+                            const { logout } = useAuthStore.getState();
+                            logout();
+                        }
+                    }
+                ]
+            );
+        }
+    }, [user, role]);
 
     // Check for active job on mount
     useEffect(() => {
@@ -39,6 +62,16 @@ export default function DriverHomeScreen() {
 
     const handleToggleOnline = async (value: boolean) => {
         if (isUpdatingStatus) return;
+
+        // Prevent non-drivers from going online
+        if (role !== 'driver') {
+            Alert.alert(
+                "ไม่สามารถดำเนินการได้",
+                "คุณต้องเข้าสู่ระบบด้วยบัญชีคนขับเพื่อใช้ฟีเจอร์นี้",
+                [{ text: "ตกลง" }]
+            );
+            return;
+        }
 
         setIsUpdatingStatus(true);
         console.log(`[Status] Toggling status to: ${value ? 'Online' : 'Offline'}`);
@@ -231,8 +264,15 @@ export default function DriverHomeScreen() {
         return (
             <View className="bg-white p-5 rounded-xl shadow-sm mb-4 border border-gray-100">
                 <View className="flex-row justify-between mb-4">
-                    <View className="bg-green-100 px-3 py-1 rounded-full">
-                        <Text className="text-green-700 font-bold text-xs">{distance} km</Text>
+                    <View className="flex-row space-x-2">
+                        <View className="bg-green-100 px-3 py-1 rounded-full">
+                            <Text className="text-green-700 font-bold text-xs">{distance} km</Text>
+                        </View>
+                        {job.stops?.length > 0 && (
+                            <View className="bg-orange-100 px-3 py-1 rounded-full">
+                                <Text className="text-orange-700 font-bold text-xs">{job.stops.length} STOPS</Text>
+                            </View>
+                        )}
                     </View>
                     <Text className="text-xl font-bold text-green-600">
                         ฿{job.price ? formatPrice(job.price) : '-'}

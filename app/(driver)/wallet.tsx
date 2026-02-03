@@ -130,6 +130,10 @@ export default function DriverWalletScreen() {
                 customerEphemeralKeySecret: ephemeralKey,
                 customerId: customer,
                 merchantDisplayName: 'Pet Transport Driver Wallet',
+                returnURL: 'petgo://stripe-redirect', // Required for Android to prevent crashes
+                defaultBillingDetails: {
+                    email: user?.email ?? undefined
+                },
                 appearance: {
                     colors: {
                         primary: '#00A862',
@@ -139,7 +143,7 @@ export default function DriverWalletScreen() {
             });
 
             if (initError) {
-                Alert.alert('Error', initError.message);
+                Alert.alert('เกิดข้อผิดพลาด', initError.message);
                 setIsLoading(false);
                 return;
             }
@@ -149,7 +153,7 @@ export default function DriverWalletScreen() {
 
             if (presentError) {
                 if (presentError.code !== 'Canceled') {
-                    Alert.alert('Error', presentError.message);
+                    Alert.alert('เกิดข้อผิดพลาด', presentError.message);
                 }
             } else {
                 // 4. Verify with backend

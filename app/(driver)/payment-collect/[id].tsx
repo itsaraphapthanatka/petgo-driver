@@ -6,6 +6,7 @@ import { AppButton } from '../../../components/ui/AppButton';
 import { Check, ArrowLeft, Copy, Wallet, CreditCard } from 'lucide-react-native';
 import { useJobStore } from '../../../store/useJobStore';
 import { orderService } from '../../../services/orderService';
+import { api } from '../../../services/api';
 import { formatPrice } from '../../../utils/format';
 import { Order } from '../../../types/order';
 
@@ -32,7 +33,17 @@ export default function PaymentCollectScreen() {
             }
         };
         fetchOrder();
-    }, [id]);
+
+        const interval = setInterval(async () => {
+            // Try to sync if promptpay
+            if (order?.payment_method === 'promptpay' || activeJob?.payment_method === 'promptpay') {
+                await api.syncPayment(Number(id));
+            }
+            fetchOrder();
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [id, order?.payment_method]);
 
     const handleConfirmPayment = async () => {
         if (!order) return;

@@ -73,7 +73,13 @@ function CustomerPaymentScreen() {
             await api.syncPayment(Number(id));
             const updatedOrder = await fetchData();
             if (updatedOrder?.payment_status === 'paid') {
+<<<<<<< HEAD
                 // Success - UI will update automatically
+=======
+                // Success - UI will update automatically via state
+                // Alert.alert("สำเร็จ", "ยืนยันการชำระเงินเรียบร้อยแล้ว!"); 
+                // Removed alert to just show success UI immediately as requested
+>>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
             } else {
                 Alert.alert("รอการยืนยัน", "ยังไม่พบยอดชำระเงิน กรุณาลองใหม่อีกครั้ง");
             }

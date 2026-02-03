@@ -46,7 +46,12 @@ export default function JobPreviewScreen() {
                     longitude: fetchedOrder.dropoff_lng
                 };
 
-                const route = await hereMapApi.getHereRoute(origin, destination, HERE_API_KEY);
+                const route = await hereMapApi.getHereRoute(
+                    origin,
+                    destination,
+                    fetchedOrder.stops.map(s => ({ latitude: s.lat, longitude: s.lng })),
+                    HERE_API_KEY
+                );
                 setRouteCoordinates(route);
 
                 // Calculate distance
@@ -189,7 +194,25 @@ export default function JobPreviewScreen() {
                         <View className="w-3 h-3 bg-red-500 rounded-full" />
                     </View>
                 </Marker>
+<<<<<<< HEAD
             </AppMapView>
+=======
+
+                {/* Stop Markers */}
+                {order.stops?.map((stop, index) => (
+                    <Marker
+                        key={`stop-${index}`}
+                        coordinate={{ latitude: stop.lat, longitude: stop.lng }}
+                        title={`Stop ${index + 1}`}
+                        anchor={{ x: 0.5, y: 1 }}
+                    >
+                        <View className="bg-white p-2 rounded-full border-2 border-orange-400 shadow-lg">
+                            <View className="w-3 h-3 bg-orange-400 rounded-full" />
+                        </View>
+                    </Marker>
+                ))}
+            </MapView>
+>>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
 
             {/* Back Button */}
             <TouchableOpacity
@@ -243,12 +266,29 @@ export default function JobPreviewScreen() {
                             <View className="w-2 h-2 rounded-full bg-blue-500 mt-2 mr-3" />
                             <View className="flex-1">
                                 <Text className="text-xs text-gray-500 uppercase font-semibold mb-1">PICK UP</Text>
-                                <Text className="text-gray-900 font-semibold text-base">
+                                <Text className="text-gray-900 font-semibold text-base" numberOfLines={2}>
                                     {order.pickup_address}
                                 </Text>
                             </View>
                         </View>
+                        {order.stops?.length > 0 && <View className="w-0.5 h-6 bg-gray-200 ml-0.75 my-1" />}
                     </View>
+
+                    {/* Stops */}
+                    {order.stops?.map((stop, index) => (
+                        <View key={`stop-${index}`} className="mb-4">
+                            <View className="flex-row items-start">
+                                <View className="w-2 h-2 rounded-full bg-orange-400 mt-2 mr-3" />
+                                <View className="flex-1">
+                                    <Text className="text-xs text-gray-500 uppercase font-semibold mb-1">STOP {index + 1}</Text>
+                                    <Text className="text-gray-900 font-semibold text-base" numberOfLines={2}>
+                                        {stop.address}
+                                    </Text>
+                                </View>
+                            </View>
+                            <View className="w-0.5 h-6 bg-gray-200 ml-0.75 my-1" />
+                        </View>
+                    ))}
 
                     {/* Dropoff Location */}
                     <View className="mb-6 pb-6 border-b border-gray-100">
@@ -271,6 +311,15 @@ export default function JobPreviewScreen() {
                                 ฿{formatPrice(serviceFare)}
                             </Text>
                         </View>
+
+                        {order.stops?.length > 0 && (
+                            <View className="flex-row justify-between mb-3">
+                                <Text className="text-gray-700">จุดพัก ({order.stops.length} จุด)</Text>
+                                <Text className="text-gray-900 font-semibold">
+                                    +฿{formatPrice(order.stops.length * 30)}
+                                </Text>
+                            </View>
+                        )}
 
                         {hasSurge && (
                             <View className="flex-row justify-between mb-3">

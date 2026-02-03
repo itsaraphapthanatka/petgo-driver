@@ -84,7 +84,9 @@ export const orderService = {
         const response = await fetch(`${API_BASE_URL}/orders/`, { headers });
 
         if (!response.ok) {
-            throw new Error('Failed to fetch pending orders');
+            const errorText = await response.text();
+            console.error('Failed to fetch pending orders:', response.status, errorText);
+            throw new Error(`Failed to fetch pending orders: ${response.status} - ${errorText}`);
         }
 
         const orders: Order[] = await response.json();
@@ -187,6 +189,21 @@ export const orderService = {
         return await response.json();
     },
 
+    updateStopStatus: async (orderId: number, stopId: number, status: string): Promise<Order> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/orders/${orderId}/stops/${stopId}/status`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ status }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to update stop status: ${response.status} - ${errorText}`);
+        }
+
+        return await response.json();
+    },
     updateCustomerLocation: async (orderId: number, lat: number, lng: number): Promise<Order> => {
         const headers = await getAuthHeaders();
         const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {

@@ -70,7 +70,7 @@ export default function CustomerHome() {
         (async () => {
             // 1. Check for Active Order
             if (user?.id) {
-                const activeOrder = await orderService.getActiveOrder(user.id);
+                const activeOrder = await orderService.getActiveOrder();
                 if (activeOrder) {
                     console.log("Found active order:", activeOrder.id);
 

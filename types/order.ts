@@ -1,12 +1,20 @@
 // Order types based on API schema at http://192.168.1.127:8000/openapi.json
 
 export interface OrderStop {
+<<<<<<< HEAD
     id?: number;
+=======
+    id: number;
+>>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
     order_id?: number;
     address: string;
     lat: number;
     lng: number;
     order_index: number;
+<<<<<<< HEAD
+=======
+    status: 'pending' | 'arrived' | 'departed';
+>>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
 }
 
 export interface UserOut {
@@ -66,6 +74,10 @@ export interface Order {
     pet: PetOut;
     pets: PetOut[]; // New array
     stops: OrderStop[];
+<<<<<<< HEAD
+=======
+    current_stop_index: number;
+>>>>>>> e2435b8 (feat: Implement multi-step driver registration, add push notification service, and update car icon.)
 }
 
 export interface OrderCreate {
