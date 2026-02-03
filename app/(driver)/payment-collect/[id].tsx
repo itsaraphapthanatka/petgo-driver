@@ -49,10 +49,7 @@ export default function PaymentCollectScreen() {
         if (!order) return;
         setConfirming(true);
         try {
-            // First confirm payment (mark as paid)
-            await orderService.confirmPayment(order.id);
-
-            // Then complete the order
+            // Mark as completed and paid (based on backend logic)
             await orderService.updateOrderStatus(order.id, 'completed');
 
             Alert.alert("Success", "Job completed and payment collected!", [

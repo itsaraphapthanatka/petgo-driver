@@ -567,5 +567,19 @@ export const api = {
             throw new Error(`Failed to update bank: ${errorText}`);
         }
         return response.json();
+    },
+
+    requestWithdrawal: async (amount: number): Promise<any> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/wallet/withdraw`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ amount })
+        });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Failed to request withdrawal' }));
+            throw new Error(errorData.detail || 'Failed to request withdrawal');
+        }
+        return response.json();
     }
 };
