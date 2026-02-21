@@ -647,6 +647,18 @@ export default function ActiveJobScreen() {
                             <Text className="text-gray-900 font-semibold" numberOfLines={2}>{order.dropoff_address}</Text>
                         </View>
 
+                        {order.is_round_trip && (
+                            <View className="mb-4 bg-blue-50 border border-blue-100 rounded-xl p-3 flex-row items-center">
+                                <View className="w-8 h-8 rounded-full bg-blue-100 items-center justify-center mr-3">
+                                    <Text className="text-lg">🔁</Text>
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="text-blue-800 font-bold text-sm">รอบไป-กลับ (Round-Trip)</Text>
+                                    <Text className="text-blue-600 text-xs mt-0.5">เวลากลับ: <Text className="font-semibold">{order.return_time}</Text></Text>
+                                </View>
+                            </View>
+                        )}
+
                         <View className="flex-row items-center justify-between border-t border-b border-gray-100 py-4 mb-4">
                             <View className="flex-row items-center flex-1">
                                 <View className="w-12 h-12 bg-gray-200 rounded-full items-center justify-center mr-3">

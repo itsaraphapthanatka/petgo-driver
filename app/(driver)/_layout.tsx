@@ -9,6 +9,7 @@ export default function DriverLayout() {
             <Stack.Screen name="notifications" options={{ title: 'การแจ้งเตือน', headerShown: true }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
             <Stack.Screen name="wallet" options={{ headerShown: false }} />
+            <Stack.Screen name="history/[id]" options={{ title: 'Trip Details', headerShown: false }} />
         </Stack>
     );
 }

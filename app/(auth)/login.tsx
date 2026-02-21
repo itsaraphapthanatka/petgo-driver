@@ -83,7 +83,7 @@ export default function LoginScreen() {
                         <View className="w-20 h-20 bg-green-100 rounded-2xl items-center justify-center mb-4 transform -rotate-6">
                             <Text className="text-4xl">🐾</Text>
                         </View>
-                        <Text className="text-3xl font-bold text-gray-900">{t('login_screen.title')}</Text>
+                        {/* <Text className="text-3xl font-bold text-gray-900">{t('login_screen.title')}</Text> */}
                         <Text className="text-gray-500 mt-2">{t('login_screen.subtitle')}</Text>
                     </View>
 

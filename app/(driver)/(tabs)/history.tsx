@@ -53,7 +53,7 @@ export default function DriverHistoryScreen() {
         <TouchableOpacity
             key={order.id}
             className="bg-white p-4 rounded-xl mb-3 border border-gray-100 shadow-sm"
-            onPress={() => router.push(`/(driver)/job/${order.id}`)}
+            onPress={() => router.push(`/(driver)/history/${order.id}`)}
         >
             <View className="flex-row justify-between items-start mb-3">
                 <View className="flex-1">
@@ -108,7 +108,7 @@ export default function DriverHistoryScreen() {
                 </View>
                 <View className="items-end">
                     <Text className="text-xs text-gray-500">รายได้ของคุณ</Text>
-                    <Text className="text-lg font-bold text-green-600">฿{formatPrice((order.price || 0) * 0.8)}</Text>
+                    <Text className="text-lg font-bold text-green-600">฿{formatPrice(order.driver_earnings || 0)}</Text>
                 </View>
             </View>
         </TouchableOpacity>

@@ -272,9 +272,17 @@ export default function DriverHomeScreen() {
                             </View>
                         )}
                     </View>
-                    <Text className="text-xl font-bold text-green-600">
-                        ฿{job.price ? formatPrice(job.price) : '-'}
-                    </Text>
+                    <View className="items-end">
+                        <Text className="text-xl font-bold text-green-600">
+                            ฿{job.price ? formatPrice(job.price) : '-'}
+                        </Text>
+                        {job.is_round_trip && (
+                            <View className="bg-blue-100 px-2 py-0.5 rounded mt-1 items-center flex-row">
+                                <Text className="text-blue-700 font-bold text-[10px] mr-1">🔁 ไป-กลับ</Text>
+                                <Text className="text-blue-600 text-[10px] ml-1">{job.return_time}</Text>
+                            </View>
+                        )}
+                    </View>
                 </View>
 
                 <View className="mb-4">

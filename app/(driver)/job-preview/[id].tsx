@@ -236,11 +236,17 @@ export default function JobPreviewScreen() {
                                 {distance.toFixed(1)} km • {duration} นาที
                             </Text>
                         </View>
-                        <View className="bg-green-100 px-4 py-2 rounded-xl">
+                        <View className="bg-green-100 px-4 py-2 rounded-xl mt-1 self-start">
                             <Text className="text-green-700 font-bold text-xl">
                                 ฿{order.price ? formatPrice(order.price) : '-'}
                             </Text>
                         </View>
+                        {order.is_round_trip && (
+                            <View className="bg-blue-100 px-3 py-1.5 rounded-xl mt-2 self-start flex-row items-center border border-blue-200">
+                                <Text className="text-blue-700 font-bold text-sm mr-1.5">🔁 ไป-กลับ</Text>
+                                <Text className="text-blue-600 text-xs font-medium bg-white px-2 py-0.5 rounded-full shadow-sm">{order.return_time || 'ไม่ระบุ'}</Text>
+                            </View>
+                        )}
                     </View>
 
                     {/* Pickup Location */}

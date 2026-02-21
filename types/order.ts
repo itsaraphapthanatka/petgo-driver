@@ -67,6 +67,8 @@ export interface Order {
     pet: PetOut;
     pets: PetOut[]; // New array
     stops: OrderStop[];
+    is_round_trip?: boolean;
+    return_time?: string;
 }
 
 export interface OrderCreate {

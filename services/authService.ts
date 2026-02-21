@@ -149,7 +149,7 @@ export const authService = {
     async verifyOTP(phoneNumber: string, otp: string): Promise<AuthResponse> {
         try {
             const url = `${API_BASE_URL}/auth/verify-otp`;
-            const body = { phone_number: phoneNumber, otp };
+            const body = { phone_number: phoneNumber, otp, role: 'driver' };
 
             console.log(`[authService] Verifying OTP at: ${url}`);
             console.log(`[authService] Request body:`, body);

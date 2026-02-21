@@ -65,10 +65,9 @@ function RootLayout() {
                 // Not a driver, show error and logout
                 const { logout } = useAuthStore.getState();
                 logout();
-                const { t } = require('react-i18next').useTranslation();
                 require('react-native').Alert.alert(
-                    "Access Denied",
-                    "This application is for drivers only. Please use the customer app or contact support."
+                    i18n.t('access_denied', "Access Denied"),
+                    i18n.t('driver_only_error', "This application is for drivers only. Please use the customer app or contact support.")
                 );
             }
         } else if (!isAuthenticated && !inAuthGroup) {
