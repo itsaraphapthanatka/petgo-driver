@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import {
     LoginRequest,
-    RegisterRequest,
+    DriverRegisterRequest,
     OTPRequest,
     OTPVerifyRequest,
     AuthResponse,
@@ -87,11 +87,13 @@ export const authService = {
     },
 
     /**
-     * Register new user
+     * Register a new driver (driver app only).
+     * POST /auth/driver/register requires a verified OTP for the phone (see requestOTP) plus vehicle info.
+     * The customer app's copy of this file registers customers via POST /auth/register instead.
      */
-    async register(data: RegisterRequest): Promise<AuthResponse> {
+    async register(data: DriverRegisterRequest): Promise<AuthResponse> {
         try {
-            const response = await fetch(`${API_BASE_URL}/auth/register`, {
+            const response = await fetch(`${API_BASE_URL}/auth/driver/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -100,8 +102,12 @@ export const authService = {
             });
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Registration failed');
+                const error = await response.json().catch(() => ({}));
+                // FastAPI: `detail` is a string for HTTPException, a list of {msg, ...} for 422 validation errors
+                const detail = Array.isArray(error.detail)
+                    ? error.detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join(', ')
+                    : error.detail;
+                throw new Error(detail || 'Registration failed');
             }
 
             const authData: AuthResponse = await response.json();

@@ -42,7 +42,7 @@ export default function DriverChatScreen() {
         }).catch(() => setIsLoading(false));
 
         // Mark as read
-        api.markChatRead(Number(orderId), userId);
+        api.markChatRead(Number(orderId));
 
         // Connect Socket as driver
         connectChat(

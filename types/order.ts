@@ -20,6 +20,9 @@ export interface UserOut {
 export interface DriverOut {
     id: number;
     user_id: number;
+    // Backend DriverOut exposes contact fields at top level (drivers are no longer coupled to users).
+    full_name?: string | null;
+    phone?: string | null;
     vehicle_type?: string | null;
     vehicle_plate?: string | null;
     is_online: boolean;

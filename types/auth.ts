@@ -24,6 +24,17 @@ export interface RegisterRequest {
     password: string;
 }
 
+/** Payload for POST /auth/driver/register (backend schemas.DriverRegister). Used by the driver app only. */
+export interface DriverRegisterRequest {
+    full_name: string;
+    phone: string;
+    email?: string;
+    password: string;
+    vehicle_type: string; // key from GET /pricing/vehicle-types, e.g. 'car' | 'suv' | 'van'
+    vehicle_plate: string;
+    otp: string; // 6-digit code from POST /auth/request-otp for the same phone
+}
+
 export interface OTPRequest {
     phone_number: string;
 }

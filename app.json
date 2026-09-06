@@ -16,9 +16,6 @@
     },
     "ios": {
       "supportsTablet": true,
-      "config": {
-        "googleMapsApiKey": "AIzaSyDnGZEQN5YUH1LFOTw1UzriihB_VbqzlAQ"
-      },
       "bundleIdentifier": "com.petgo.driver",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -35,11 +32,6 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyDnGZEQN5YUH1LFOTw1UzriihB_VbqzlAQ"
-        }
-      },
       "package": "com.petgo.driver",
       "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true

@@ -56,12 +56,26 @@ export interface DriverDetails {
     }
 }
 
+/** Nested driver in GET /driver_locations/* (backend DriverPublicOut): no contact, bank, wallet or document data. */
+export interface DriverPublic {
+    id: number;
+    full_name?: string;
+    vehicle_type?: string;
+    vehicle_plate?: string;
+    vehicle_brand?: string;
+    vehicle_model?: string;
+    vehicle_color?: string;
+    vehicle_image?: string;
+    profile_image_url?: string;
+    is_online: boolean;
+}
+
 export interface DriverLocation {
     driver_id: number;
     lat: number;
     lng: number;
     id: number;
-    driver: DriverDetails;
+    driver: DriverPublic;
 }
 
 export interface VehicleTypeRate {
@@ -201,9 +215,12 @@ export const api = {
 
     getDriverLocations: async (): Promise<DriverLocation[]> => {
         try {
-            const response = await fetch(`${API_BASE_URL}/driver_locations/`);
+            // GET /driver_locations/ requires a signed-in user (any role) since the PII hardening.
+            const response = await fetch(`${API_BASE_URL}/driver_locations/`, {
+                headers: await getAuthHeaders(),
+            });
             if (!response.ok) {
-                throw new Error('Failed to fetch driver locations');
+                throw new Error(`Failed to fetch driver locations (HTTP ${response.status})`);
             }
             return await response.json();
         } catch (error) {
@@ -215,9 +232,12 @@ export const api = {
 
     getDriverLocationById: async (id: number): Promise<DriverLocation | null> => {
         try {
-            const response = await fetch(`${API_BASE_URL}/driver_locations/${id}`);
+            // Requires a token; customers may only read the driver of their own active order (403 otherwise).
+            const response = await fetch(`${API_BASE_URL}/driver_locations/${id}`, {
+                headers: await getAuthHeaders(),
+            });
             if (!response.ok) {
-                throw new Error('Failed to fetch driver location');
+                throw new Error(`Failed to fetch driver location (HTTP ${response.status})`);
             }
             return await response.json();
         } catch (error) {
@@ -310,10 +330,11 @@ export const api = {
         }
     },
 
-    markChatRead: async (orderId: number, userId: number): Promise<void> => {
+    markChatRead: async (orderId: number): Promise<void> => {
         try {
             const headers = await getAuthHeaders();
-            await fetch(`${API_BASE_URL}/chat/${orderId}/read?user_id=${userId}`, {
+            // The backend derives the reader (customer/driver) from the token; it ignores query params.
+            await fetch(`${API_BASE_URL}/chat/${orderId}/read`, {
                 method: 'POST',
                 headers,
             });

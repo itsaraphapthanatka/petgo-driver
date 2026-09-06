@@ -1,4 +1,10 @@
-export default ({ config }) => ({
+export default ({ config }) => {
+    // เตือนตั้งแต่ตอน build ถ้าลืมใส่ key ใน .env แทนที่จะไปเจอแผนที่พื้นเทาแล้วงมหาสาเหตุ
+    if (!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY) {
+        console.warn('[app.config.js] ไม่พบ EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ใน .env — แผนที่จะไม่แสดง');
+    }
+
+    return ({
     ...config,
     ios: {
         ...config.ios,
@@ -26,4 +32,5 @@ export default ({ config }) => ({
             projectId: "fe18173f-c822-4d80-9c28-c1132877d6e7",
         },
     },
-});
+    });
+};

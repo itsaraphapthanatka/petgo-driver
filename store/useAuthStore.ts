@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { authService } from '../services/authService';
-import { User } from '../types/auth';
+import { User, DriverRegisterRequest } from '../types/auth';
+import { useBookingStore } from './useBookingStore';
+import { useJobStore } from './useJobStore';
 
 type UserRole = 'customer' | 'driver' | 'admin' | null;
 
@@ -12,7 +14,7 @@ interface AuthState {
     error: string | null;
     loginWithPassword: (username: string, password: string) => Promise<void>;
     loginWithOTP: (phoneNumber: string, otp: string) => Promise<void>;
-    register: (fullName: string, phone: string, email: string, password: string) => Promise<void>;
+    register: (data: DriverRegisterRequest) => Promise<void>;
     loadUser: () => Promise<void>;
     logout: () => Promise<void>;
     setUser: (user: User | null) => void;
@@ -64,15 +66,10 @@ export const useAuthStore = create<AuthState>((set) => ({
         }
     },
 
-    register: async (fullName: string, phone: string, email: string, password: string) => {
+    register: async (data: DriverRegisterRequest) => {
         set({ isLoading: true, error: null });
         try {
-            const response = await authService.register({
-                full_name: fullName,
-                phone,
-                email: email || undefined,
-                password,
-            });
+            const response = await authService.register(data);
             set({
                 isAuthenticated: true,
                 role: response.role as UserRole,
@@ -111,6 +108,15 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     logout: async () => {
         await authService.logout();
+
+        // Clear other stores
+        if (useBookingStore.getState().clearBooking) {
+            useBookingStore.getState().clearBooking();
+        }
+        if (useJobStore.getState().clearJobs) {
+            useJobStore.getState().clearJobs();
+        }
+
         set({
             isAuthenticated: false,
             role: null,
