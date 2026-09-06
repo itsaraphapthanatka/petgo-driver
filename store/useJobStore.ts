@@ -77,7 +77,7 @@ export const useJobStore = create<JobState>((set, get) => ({
     },
 
     clearJobs: () => {
-        set({ pendingJobs: [], activeJob: null, error: null });
+        set({ pendingJobs: [], activeJob: null, error: null, declinedJobIds: [] });
     },
 
     refreshActiveJob: async () => {
