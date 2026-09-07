@@ -22,7 +22,6 @@ export function useEstimatePrice(params: {
                 dropoff_lng: params.dropoff.longitude,
                 vehicle_type: params.vehicleId,
                 pet_weight_kg: params.petWeight,
-                provider: 'here',
             })
             .then(res => setPrice(res.estimated_price))
             .finally(() => setLoading(false));

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Alert, ActivityIndicator, Animated, PanResponder, Dimensions, ScrollView, Platform, Linking, Modal, Image } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -13,11 +13,13 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { orderService } from '../../../services/orderService';
 import { api } from '../../../services/api';
 import { Order } from '../../../types/order';
-import { hereMapApi, LatLng } from '../../../services/hereMapApi';
+import {
+    googleDirectionsApi, LatLng, RouteRequest, RouteRequestRecord, shouldRefetchRoute, trimRouteToPoint,
+} from '../../../services/googleDirectionsApi';
+import { RouteErrorBanner } from '../../../components/RouteErrorBanner';
 import * as Location from 'expo-location';
 import { formatPrice } from '../../../utils/format';
 
-const HERE_API_KEY = process.env.EXPO_PUBLIC_HERE_MAPS_API_KEY || "";
 
 export default function ActiveJobScreen() {
     const { id } = useLocalSearchParams();
@@ -28,7 +30,15 @@ export default function ActiveJobScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [order, setOrder] = useState<Order | null>(null);
     const [routeCoordinates, setRouteCoordinates] = useState<LatLng[]>([]);
+    const [routeError, setRouteError] = useState<unknown>(null);
     const [currentLocation, setCurrentLocation] = useState<LatLng | null>(null);
+    const routeRequestRef = useRef<RouteRequestRecord | null>(null);
+    const routeSeqRef = useRef(0);
+    // Between (throttled) refetches, start the drawn route at the driver's live position
+    const displayedRoute = useMemo(
+        () => (currentLocation && routeCoordinates.length > 0 ? trimRouteToPoint(routeCoordinates, currentLocation) : routeCoordinates),
+        [routeCoordinates, currentLocation]
+    );
     const [showQRModal, setShowQRModal] = useState(false);
     const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
     const [isFetchingQR, setIsFetchingQR] = useState(false);
@@ -133,50 +143,65 @@ export default function ActiveJobScreen() {
         };
     }, []);
 
-    // Fetch Route
+    // Fetch Route.
+    // The 5 s order poll re-runs this effect; shouldRefetchRoute() only lets a (billed) request out
+    // when the target changed, or the driver moved >= 50 m and >= 30 s passed. Otherwise the drawn
+    // route stays untouched (no flicker).
     useEffect(() => {
-        const fetchRoute = async () => {
-            if (!order) return;
+        if (!order) return;
 
-            let origin: LatLng | null = null;
-            let destination: LatLng | null = null;
+        let origin: LatLng | null = null;
+        let destination: LatLng | null = null;
 
-            if (status === 'accepted' || status === 'arrived') {
-                if (currentLocation) {
-                    origin = currentLocation;
-                } else {
-                    origin = {
-                        latitude: order.pickup_lat - 0.005,
-                        longitude: order.pickup_lng - 0.005
-                    };
-                }
-                destination = {
+        if (status === 'accepted' || status === 'arrived') {
+            if (currentLocation) {
+                origin = currentLocation;
+            } else {
+                origin = {
+                    latitude: order.pickup_lat - 0.005,
+                    longitude: order.pickup_lng - 0.005
+                };
+            }
+            destination = {
+                latitude: order.pickup_lat,
+                longitude: order.pickup_lng
+            };
+        } else if (status === 'picked_up' || status === 'in_progress') {
+            if (currentLocation) {
+                origin = currentLocation;
+            } else {
+                origin = {
                     latitude: order.pickup_lat,
                     longitude: order.pickup_lng
                 };
-            } else if (status === 'picked_up' || status === 'in_progress') {
-                if (currentLocation) {
-                    origin = currentLocation;
-                } else {
-                    origin = {
-                        latitude: order.pickup_lat,
-                        longitude: order.pickup_lng
-                    };
-                }
-                destination = {
-                    latitude: order.dropoff_lat,
-                    longitude: order.dropoff_lng
-                };
             }
+            destination = {
+                latitude: order.dropoff_lat,
+                longitude: order.dropoff_lng
+            };
+        }
 
-            if (origin && destination) {
-                const route = await hereMapApi.getHereRoute(
-                    origin,
-                    destination,
-                    (status === 'in_progress' || status === 'picked_up') ? order.stops?.map(s => ({ latitude: s.lat, longitude: s.lng })) : [],
-                    HERE_API_KEY
-                );
+        if (!origin || !destination) return;
+
+        const request: RouteRequest = {
+            origin,
+            destination,
+            stops: (status === 'in_progress' || status === 'picked_up')
+                ? (order.stops ?? []).map(s => ({ latitude: s.lat, longitude: s.lng }))
+                : [],
+            mode: 'car',
+        };
+        if (!shouldRefetchRoute(routeRequestRef.current, request)) return;
+
+        const seq = ++routeSeqRef.current;
+        routeRequestRef.current = { request, at: Date.now(), failed: false };
+
+        const fetchRoute = async () => {
+            try {
+                const route = await googleDirectionsApi.getRoute(request.origin, request.destination, request.stops);
+                if (seq !== routeSeqRef.current) return; // superseded by a newer request
                 setRouteCoordinates(route);
+                setRouteError(null);
 
                 if (mapRef.current && route.length > 0) {
                     mapRef.current.fitToCoordinates(route, {
@@ -184,6 +209,12 @@ export default function ActiveJobScreen() {
                         animated: true,
                     });
                 }
+            } catch (error) {
+                if (seq !== routeSeqRef.current) return;
+                // Surface the real reason (key denied, no route, offline) instead of an empty map
+                routeRequestRef.current = { request, at: Date.now(), failed: true };
+                setRouteCoordinates([]);
+                setRouteError(error);
             }
         };
 
@@ -500,7 +531,7 @@ export default function ActiveJobScreen() {
                 >
                     {routeCoordinates.length > 0 && (
                         <Polyline
-                            coordinates={routeCoordinates}
+                            coordinates={displayedRoute}
                             strokeWidth={4}
                             strokeColor="#3B82F6"
                         />
@@ -577,6 +608,8 @@ export default function ActiveJobScreen() {
                         </Marker>
                     )}
                 </AppMapView>
+
+                <RouteErrorBanner error={routeError} />
 
                 <TouchableOpacity
                     onPress={() => router.back()}

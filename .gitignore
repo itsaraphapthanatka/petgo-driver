@@ -42,3 +42,7 @@ yarn-error.*
 .env
 google-services.json
 google-services.base64
+
+# Claude Code
+.claude/settings.local.json
+.claude/agent-memory/

@@ -114,7 +114,7 @@ export default function DriverHomeScreen() {
         let jobInterval: NodeJS.Timeout | null = null;
 
         const startServices = async () => {
-            if (isOnline) {
+            if (isOnline && user?.id) {
                 console.log("Status: ONLINE - Starting tracking & polling");
 
                 // 1. Start Job Polling

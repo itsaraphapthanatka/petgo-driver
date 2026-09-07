@@ -7,7 +7,6 @@ export interface PricingRequest {
     stops?: { lat: number; lng: number }[];
     vehicle_type: string;
     pet_weight_kg: number;
-    provider?: string;
 }
 
 export interface PricingResponse {
@@ -98,6 +97,7 @@ export interface PricingSettings {
 }
 
 import { Platform } from 'react-native';
+import { useAuthStore } from '../store/useAuthStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const getBaseUrl = () => {
@@ -192,15 +192,18 @@ export const api = {
 
     estimatePrice: async (req: PricingRequest): Promise<PricingResponse> => {
         try {
-            console.log("Sending estimatePrice request:", JSON.stringify(req, null, 2));
+            // Authenticated so the backend can lock this endpoint (it calls Google Directions per request).
             const response = await fetch(`${API_BASE_URL}/pricing/estimate`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: await getAuthHeaders(),
                 body: JSON.stringify(req),
             });
 
+            if (response.status === 401) {
+                // Expired / invalid session: clear it so the app returns to login instead of
+                // silently falling back to a locally computed price.
+                await useAuthStore.getState().logout();
+            }
             if (!response.ok) {
                 const errorText = await response.text();
                 throw new Error(`API Error: ${response.status} - ${errorText}`);

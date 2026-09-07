@@ -46,7 +46,6 @@ export const registerForPushNotificationsAsync = async () => {
                 projectId,
             })).data;
 
-            console.log("Expo Push Token:", token);
 
             // Send token to backend
             await api.updateDeviceToken(token);

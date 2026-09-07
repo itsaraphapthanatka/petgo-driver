@@ -20,7 +20,6 @@ export const longdoMapApi = {
             });
 
             const url = `${LONGDO_SEARCH_API_URL}?${params.toString()}`;
-            console.log("Fetching Longdo Search:", url);
 
             const response = await fetch(url);
 

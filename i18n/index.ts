@@ -204,7 +204,13 @@ const resources = {
             date: "Date",
             trip_details: "Trip Details",
             back_to_home: "Back to Home",
-            driver: "Driver"
+            driver: "Driver",
+            route_not_found: "No route found between the selected points",
+            route_error_denied: "Google rejected the maps API key (REQUEST_DENIED). Please contact support.",
+            route_error_config: "Google Maps API key is not configured in this app",
+            route_error_quota: "Route lookup quota exceeded. Please try again later.",
+            route_error_network: "No internet connection. Could not load the route.",
+            route_error_generic: "Could not load the route ({{detail}})"
         }
     },
     th: {
@@ -408,7 +414,13 @@ const resources = {
             date: "วันที่",
             trip_details: "รายละเอียดการเดินทาง",
             back_to_home: "กลับสู่หน้าหลัก",
-            driver: "คนขับ"
+            driver: "คนขับ",
+            route_not_found: "ไม่พบเส้นทางระหว่างจุดที่เลือก",
+            route_error_denied: "Google ปฏิเสธคีย์แผนที่ (REQUEST_DENIED) กรุณาติดต่อผู้ดูแลระบบ",
+            route_error_config: "แอปยังไม่ได้ตั้งค่า Google Maps API key",
+            route_error_quota: "โควตาการค้นหาเส้นทางเต็มแล้ว กรุณาลองใหม่ภายหลัง",
+            route_error_network: "ไม่มีการเชื่อมต่ออินเทอร์เน็ต ไม่สามารถโหลดเส้นทางได้",
+            route_error_generic: "โหลดเส้นทางไม่สำเร็จ ({{detail}})"
         }
     }
 };

@@ -1,4 +1,4 @@
-import { useHereRoutes } from "./hooks/useHereRoutes";
+import { useDirectionsRoutes } from "./hooks/useDirectionsRoutes";
 import { useEstimatePrice } from "./hooks/useEstimatePrice";
 import { BookingBottomSheet } from "./components/BookingBottomSheet";
 import { RouteSelector } from "./components/RouteSelector";
@@ -19,7 +19,7 @@ export default function ConfirmBookingScreen() {
     const { petWeight = 0 } = useLocalSearchParams();
 
     const { routes, selectedRoute, selectedIndex, setSelectedIndex } =
-        useHereRoutes(pickupLocation, dropoffLocation);
+        useDirectionsRoutes(pickupLocation, dropoffLocation);
 
     const [vehicles, setVehicles] = useState(MOCK_RIDE_OPTIONS);
     const [selectedVehicle, setSelectedVehicle] = useState(vehicles[0]);

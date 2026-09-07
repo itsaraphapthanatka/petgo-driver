@@ -9,22 +9,17 @@ console.log('API_BASE_URL', API_BASE_URL);
 console.log('TOKEN_KEY', TOKEN_KEY);
 
 // Helper function to get auth headers
-async function getAuthHeaders(): Promise<HeadersInit> {
+async function getAuthHeaders(): Promise<HeadersInit | null> {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
-    console.log('getAuthHeaders: Token found', token);
     if (!token) {
-        console.warn('getAuthHeaders: No token found');
-    } else {
-        // console.log('getAuthHeaders: Token found');
+        // Silently return null instead of warning to avoid noise during logout
+        return null;
     }
 
     const headers: HeadersInit = {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
     };
-
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
 
     return headers;
 }
@@ -33,6 +28,8 @@ export const orderService = {
     // Create a new order (customer creates booking)
     createOrder: async (data: OrderCreate): Promise<Order> => {
         const headers = await getAuthHeaders();
+        if (!headers) throw new Error('Authentication required');
+
         const response = await fetch(`${API_BASE_URL}/orders/`, {
             method: 'POST',
             headers,
@@ -50,6 +47,11 @@ export const orderService = {
     // Get all orders (optionally filter by status)
     getOrders: async (status?: string): Promise<Order[]> => {
         const headers = await getAuthHeaders();
+        if (!headers) {
+            // Return empty instead of throwing if no token found (likely logout situation)
+            return [];
+        }
+
         let url = `${API_BASE_URL}/orders/`;
         if (status) {
             url += `?status=${status}`;
@@ -58,6 +60,10 @@ export const orderService = {
         const response = await fetch(url, { headers });
 
         if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+                // Silently return empty on auth errors to avoid crashes during logout
+                return [];
+            }
             const errorText = await response.text();
             console.error('Failed to fetch orders:', response.status, errorText);
             throw new Error(`Failed to fetch orders: ${response.status} - ${errorText}`);
@@ -69,6 +75,8 @@ export const orderService = {
     // Get single order by ID
     getOrder: async (orderId: number): Promise<Order> => {
         const headers = await getAuthHeaders();
+        if (!headers) throw new Error('Authentication required');
+
         const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, { headers });
 
         if (!response.ok) {
@@ -81,9 +89,12 @@ export const orderService = {
     // Get pending orders for drivers
     getPendingOrders: async (): Promise<Order[]> => {
         const headers = await getAuthHeaders();
+        if (!headers) return [];
+
         const response = await fetch(`${API_BASE_URL}/orders/`, { headers });
 
         if (!response.ok) {
+            if (response.status === 401 || response.status === 403) return [];
             const errorText = await response.text();
             console.error('Failed to fetch pending orders:', response.status, errorText);
             throw new Error(`Failed to fetch pending orders: ${response.status} - ${errorText}`);
@@ -97,6 +108,7 @@ export const orderService = {
     // Driver accepts an order
     async acceptOrder(orderId: number): Promise<Order> {
         const headers = await getAuthHeaders();
+        if (!headers) throw new Error('Authentication required');
 
         // Use the specific endpoint for accepting orders
         const response = await fetch(`${API_BASE_URL}/orders/${orderId}/accept`, {
@@ -115,6 +127,7 @@ export const orderService = {
     // Driver updates order status (picked up, completed, etc.)
     updateOrderStatus: async (orderId: number, status: string): Promise<Order> => {
         const headers = await getAuthHeaders();
+        if (!headers) throw new Error('Authentication required');
 
         let endpoint = `${API_BASE_URL}/orders/${orderId}`;
         let method = 'PATCH';
@@ -160,6 +173,8 @@ export const orderService = {
 
     cancelOrder: async (orderId: number, driverId?: number): Promise<Order> => {
         const headers = await getAuthHeaders();
+        if (!headers) throw new Error('Authentication required');
+
         console.log(`Canceling order ${orderId}`);
         const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
             method: 'PATCH',
@@ -176,6 +191,8 @@ export const orderService = {
 
     declineOrder: async (orderId: number): Promise<{ message: string }> => {
         const headers = await getAuthHeaders();
+        if (!headers) throw new Error('Authentication required');
+
         const response = await fetch(`${API_BASE_URL}/orders/${orderId}/decline`, {
             method: 'POST',
             headers,
@@ -191,6 +208,8 @@ export const orderService = {
 
     updateStopStatus: async (orderId: number, stopId: number, status: string): Promise<Order> => {
         const headers = await getAuthHeaders();
+        if (!headers) throw new Error('Authentication required');
+
         const response = await fetch(`${API_BASE_URL}/orders/${orderId}/stops/${stopId}/status`, {
             method: 'PATCH',
             headers,
@@ -206,6 +225,8 @@ export const orderService = {
     },
     updateCustomerLocation: async (orderId: number, lat: number, lng: number): Promise<Order> => {
         const headers = await getAuthHeaders();
+        if (!headers) throw new Error('Authentication required');
+
         const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
             method: 'PATCH',
             headers,

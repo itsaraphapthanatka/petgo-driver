@@ -7,13 +7,13 @@ import { AppMapView } from '../../../components/AppMapView';
 import { ArrowLeft, MapPin } from 'lucide-react-native';
 import { Order } from '../../../types/order';
 import { orderService } from '../../../services/orderService';
-import { hereMapApi, LatLng } from '../../../services/hereMapApi';
+import { googleDirectionsApi, LatLng } from '../../../services/googleDirectionsApi';
+import { RouteErrorBanner } from '../../../components/RouteErrorBanner';
 import { formatPrice } from '../../../utils/format';
 import { AppButton } from '../../../components/ui/AppButton';
 import { useJobStore } from '../../../store/useJobStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 
-const HERE_API_KEY = process.env.EXPO_PUBLIC_HERE_MAPS_API_KEY || "";
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 export default function JobPreviewScreen() {
@@ -25,6 +25,7 @@ export default function JobPreviewScreen() {
     const [order, setOrder] = useState<Order | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [routeCoordinates, setRouteCoordinates] = useState<LatLng[]>([]);
+    const [routeError, setRouteError] = useState<unknown>(null);
     const [isAccepting, setIsAccepting] = useState(false);
     const [distance, setDistance] = useState<number>(0);
     const [duration, setDuration] = useState<number>(0);
@@ -46,14 +47,6 @@ export default function JobPreviewScreen() {
                     longitude: fetchedOrder.dropoff_lng
                 };
 
-                const route = await hereMapApi.getHereRoute(
-                    origin,
-                    destination,
-                    fetchedOrder.stops.map(s => ({ latitude: s.lat, longitude: s.lng })),
-                    HERE_API_KEY
-                );
-                setRouteCoordinates(route);
-
                 // Calculate distance
                 const dist = getDistance(
                     fetchedOrder.pickup_lat,
@@ -66,14 +59,28 @@ export default function JobPreviewScreen() {
                 // Estimate duration (rough estimate: avg 40 km/h in city)
                 setDuration(Math.round((dist / 40) * 60));
 
-                // Fit map to route
-                if (mapRef.current && route.length > 0) {
-                    setTimeout(() => {
-                        mapRef.current?.fitToCoordinates(route, {
-                            edgePadding: { top: 100, right: 50, bottom: SCREEN_HEIGHT * 0.5 + 50, left: 50 },
-                            animated: true,
-                        });
-                    }, 500);
+                // A routing failure must not hide the job: catch it separately and show the banner
+                try {
+                    const route = await googleDirectionsApi.getRoute(
+                        origin,
+                        destination,
+                        fetchedOrder.stops.map(s => ({ latitude: s.lat, longitude: s.lng }))
+                    );
+                    setRouteCoordinates(route);
+                    setRouteError(null);
+
+                    // Fit map to route
+                    if (mapRef.current && route.length > 0) {
+                        setTimeout(() => {
+                            mapRef.current?.fitToCoordinates(route, {
+                                edgePadding: { top: 100, right: 50, bottom: SCREEN_HEIGHT * 0.5 + 50, left: 50 },
+                                animated: true,
+                            });
+                        }, 500);
+                    }
+                } catch (err) {
+                    setRouteCoordinates([]);
+                    setRouteError(err);
                 }
             } catch (error) {
                 console.error('Failed to fetch order:', error);
@@ -196,6 +203,7 @@ export default function JobPreviewScreen() {
                 </Marker>
             </AppMapView>
 
+            <RouteErrorBanner error={routeError} />
 
             {/* Back Button */}
             <TouchableOpacity
