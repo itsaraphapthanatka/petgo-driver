@@ -59,6 +59,7 @@ export interface Order {
     commission_rate?: number | null;
     passengers?: number;
     pet_details?: string | null;
+    vehicle_type?: string | null; // car / suv / van: the type the server priced the order for
     customer: UserOut;
     driver?: DriverOut | null;
     customer_lat?: number;
@@ -86,7 +87,10 @@ export interface OrderCreate {
     dropoff_lat: number;
     dropoff_lng: number;
     status?: OrderStatus;
+    // The quote shown to the customer. POST /orders/ re-prices the trip server-side and answers 409 when
+    // its fare for `vehicle_type` is more than 10 THB above this; the stored price is always the server's.
     price?: number | null;
+    vehicle_type?: string; // car / suv / van (key from GET /pricing/vehicle-types); without it the server guesses from price
     passengers?: number;
     pet_details?: string;
     customer_lat?: number;

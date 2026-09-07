@@ -333,6 +333,11 @@ export interface RouteRequestRecord {
     at: number;
     /** True when that request threw; allows a retry once ROUTE_REFETCH_MIN_INTERVAL_MS has passed. */
     failed: boolean;
+    /**
+     * RoutingError.code of that failure (undefined when it was not a RoutingError). Deterministic
+     * codes (see isPermanentRoutingFailure) are not retried until the target changes.
+     */
+    failureCode?: RoutingErrorCode;
 }
 
 /** The origin must have moved at least this far before the same target is routed again. */
@@ -341,6 +346,26 @@ export const ROUTE_REFETCH_MIN_MOVE_METERS = 50;
 export const ROUTE_REFETCH_MIN_INTERVAL_MS = 30_000;
 /** Points closer than this are the same place. */
 const SAME_POINT_METERS = 1;
+
+/**
+ * Failures Google answers identically for an identical request. Retrying them on the 30 s cadence
+ * would bill up to 120 requests/hour per screen for the same ZERO_RESULTS; wait for the target to
+ * change instead. Quota (OVER_*), NETWORK, HTTP_ERROR, PARSE_ERROR and UNKNOWN_ERROR stay retryable.
+ */
+const PERMANENT_ROUTE_FAILURE_CODES: readonly RoutingErrorCode[] = [
+    'ZERO_RESULTS',
+    'NOT_FOUND',
+    'REQUEST_DENIED',
+    'INVALID_REQUEST',
+    'MAX_WAYPOINTS_EXCEEDED',
+    'MAX_ROUTE_LENGTH_EXCEEDED',
+    'MISSING_KEY',
+];
+
+/** True when repeating the same request cannot produce a different answer. */
+export function isPermanentRoutingFailure(code: RoutingErrorCode | undefined): boolean {
+    return code !== undefined && PERMANENT_ROUTE_FAILURE_CODES.includes(code);
+}
 
 /** Same destination, same stops (in order) and same Google travel mode (car/truck/scooter all = driving). */
 export function isSameRouteTarget(a: RouteRequest, b: RouteRequest): boolean {
@@ -353,9 +378,13 @@ export function isSameRouteTarget(a: RouteRequest, b: RouteRequest): boolean {
 /**
  * Decide whether a new (billed) Directions request is worth it.
  * Refetch when nothing was requested yet or the target (destination / stops / mode) changed.
- * For the same target, refetch only once ROUTE_REFETCH_MIN_INTERVAL_MS has passed AND either the
+ * For the same target: a failure with a deterministic code (isPermanentRoutingFailure) is never
+ * retried; otherwise refetch only once ROUTE_REFETCH_MIN_INTERVAL_MS has passed AND either the
  * origin moved >= ROUTE_REFETCH_MIN_MOVE_METERS or the previous request failed.
  * Otherwise the caller keeps the route it already drew: no flicker, no request.
+ *
+ * Callers must pass real origins only. A placeholder (pickup while GPS or the driver position is
+ * still unknown) is recorded like any other request and blocks the real one for the interval.
  */
 export function shouldRefetchRoute(
     last: RouteRequestRecord | null,
@@ -364,6 +393,8 @@ export function shouldRefetchRoute(
 ): boolean {
     if (!last) return true;
     if (!isSameRouteTarget(last.request, next)) return true;
+    // Same request, same answer: do not pay for the same ZERO_RESULTS / REQUEST_DENIED again.
+    if (last.failed && isPermanentRoutingFailure(last.failureCode)) return false;
     if (now - last.at < ROUTE_REFETCH_MIN_INTERVAL_MS) return false;
     if (last.failed) return true;
     return distanceMeters(last.request.origin, next.origin) >= ROUTE_REFETCH_MIN_MOVE_METERS;

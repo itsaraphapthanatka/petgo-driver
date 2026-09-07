@@ -14,7 +14,7 @@ import { orderService } from '../../../services/orderService';
 import { api } from '../../../services/api';
 import { Order } from '../../../types/order';
 import {
-    googleDirectionsApi, LatLng, RouteRequest, RouteRequestRecord, shouldRefetchRoute, trimRouteToPoint,
+    googleDirectionsApi, LatLng, RouteRequest, RouteRequestRecord, isRoutingError, shouldRefetchRoute, trimRouteToPoint,
 } from '../../../services/googleDirectionsApi';
 import { RouteErrorBanner } from '../../../components/RouteErrorBanner';
 import * as Location from 'expo-location';
@@ -147,41 +147,28 @@ export default function ActiveJobScreen() {
     // The 5 s order poll re-runs this effect; shouldRefetchRoute() only lets a (billed) request out
     // when the target changed, or the driver moved >= 50 m and >= 30 s passed. Otherwise the drawn
     // route stays untouched (no flicker).
+    // Routes only from a real GPS fix. fetchOrder usually resolves before the first fix; the old
+    // placeholder origin (pickup - 0.005°) was then recorded by shouldRefetchRoute() and blocked the
+    // real request for 30 s, so every job opened with a wrong route and one wasted request.
     useEffect(() => {
-        if (!order) return;
+        if (!order || !currentLocation) return;
 
-        let origin: LatLng | null = null;
+        const origin: LatLng = currentLocation;
         let destination: LatLng | null = null;
 
         if (status === 'accepted' || status === 'arrived') {
-            if (currentLocation) {
-                origin = currentLocation;
-            } else {
-                origin = {
-                    latitude: order.pickup_lat - 0.005,
-                    longitude: order.pickup_lng - 0.005
-                };
-            }
             destination = {
                 latitude: order.pickup_lat,
                 longitude: order.pickup_lng
             };
         } else if (status === 'picked_up' || status === 'in_progress') {
-            if (currentLocation) {
-                origin = currentLocation;
-            } else {
-                origin = {
-                    latitude: order.pickup_lat,
-                    longitude: order.pickup_lng
-                };
-            }
             destination = {
                 latitude: order.dropoff_lat,
                 longitude: order.dropoff_lng
             };
         }
 
-        if (!origin || !destination) return;
+        if (!destination) return;
 
         const request: RouteRequest = {
             origin,
@@ -211,8 +198,11 @@ export default function ActiveJobScreen() {
                 }
             } catch (error) {
                 if (seq !== routeSeqRef.current) return;
-                // Surface the real reason (key denied, no route, offline) instead of an empty map
-                routeRequestRef.current = { request, at: Date.now(), failed: true };
+                // Surface the real reason (key denied, no route, offline) instead of an empty map.
+                // The code lets shouldRefetchRoute() skip retries that cannot succeed (ZERO_RESULTS, key denied).
+                routeRequestRef.current = {
+                    request, at: Date.now(), failed: true, failureCode: isRoutingError(error) ? error.code : undefined,
+                };
                 setRouteCoordinates([]);
                 setRouteError(error);
             }

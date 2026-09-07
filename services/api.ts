@@ -99,6 +99,7 @@ export interface PricingSettings {
 import { Platform } from 'react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiErrorFromResponse } from '../utils/apiError';
 
 const getBaseUrl = () => {
     let url = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.140:8000';
@@ -205,8 +206,8 @@ export const api = {
                 await useAuthStore.getState().logout();
             }
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`API Error: ${response.status} - ${errorText}`);
+                // ApiError carries the status and FastAPI's `detail` so the screen can show the real reason
+                throw await apiErrorFromResponse(response, 'API Error');
             }
 
             return await response.json();
