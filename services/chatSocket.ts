@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 let socket: WebSocket | null = null;
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.144:8000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
 // Convert HTTP/HTTPS URL to WS/WSS for WebSocket connections
 const convertToWebSocketUrl = (url: string): string => {

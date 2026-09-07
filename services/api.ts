@@ -7,6 +7,9 @@ export interface PricingRequest {
     stops?: { lat: number; lng: number }[];
     vehicle_type: string;
     pet_weight_kg: number;
+    // Ids of the customer's pets on the trip. The server reads their Pet.weight itself (same rows POST /orders/
+    // uses), so the estimate and the booking price from one source; pet_weight_kg stays for older backends.
+    pet_ids?: number[];
 }
 
 export interface PricingResponse {
@@ -101,8 +104,17 @@ import { useAuthStore } from '../store/useAuthStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiErrorFromResponse } from '../utils/apiError';
 
+// Without EXPO_PUBLIC_API_BASE_URL (.env locally, eas.json for EAS builds) fall back to a backend on the
+// developer's own machine, like the admin panel does. The old fallback was one developer's LAN IP, so any
+// build missing the variable quietly talked to a stranger's computer instead of failing where it is run.
+const DEFAULT_API_BASE_URL = 'http://localhost:8000';
+
 const getBaseUrl = () => {
-    let url = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.140:8000';
+    let url = process.env.EXPO_PUBLIC_API_BASE_URL;
+    if (!url) {
+        console.warn(`EXPO_PUBLIC_API_BASE_URL is not set; using ${DEFAULT_API_BASE_URL}`);
+        url = DEFAULT_API_BASE_URL;
+    }
     if (Platform.OS === 'android' && (url.includes('localhost') || url.includes('127.0.0.1'))) {
         return url.replace('localhost', '10.0.2.2').replace('127.0.0.1', '10.0.2.2');
     }
@@ -457,15 +469,6 @@ export const api = {
         return response.json();
     },
 
-    verifyPayment: async (paymentId: number, status: string, transactionId?: string): Promise<PaymentResponse> => {
-        const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/payments/${paymentId}/verify?status=${status}${transactionId ? `&transaction_id=${transactionId}` : ''}`, {
-            method: 'POST',
-            headers
-        });
-        if (!response.ok) throw new Error('Failed to verify payment');
-        return response.json();
-    },
     getPaymentByOrderId: async (orderId: number): Promise<PaymentResponse> => {
         const headers = await getAuthHeaders();
         const response = await fetch(`${API_BASE_URL}/payments/order/${orderId}`, { headers });

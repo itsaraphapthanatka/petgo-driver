@@ -51,7 +51,7 @@ export default function DriverWalletScreen() {
                 api.getWalletBalance(),
                 api.getWalletTransactions()
             ]);
-            setBalance(balanceData.wallet_balance);
+            setBalance(Number(balanceData.wallet_balance ?? 0)); // Numeric(10,2) arrives as a JSON string
             // Filter only withdrawals or relevant driver transactions
             setTransactions(transData.filter((t: any) => t.type === 'withdrawal' || t.type === 'earning' || t.amount > 0));
         } catch (error) {
