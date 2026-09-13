@@ -1,12 +1,20 @@
 #!/usr/bin/env node
-// Verifies that i18n/index.ts defines the same translation keys for `en` and `th`.
+// Verifies two things about the app's translations:
+//
+//   1. i18n/index.ts defines the same translation keys for `en` and `th`;
+//   2. every key the code asks for with t('...') actually exists in both languages.
+//
+// (2) exists because (1) alone reported 153/153 and 209/209 while 19 call sites used keys that were in
+// neither language. i18next returns the key itself for a missing translation, so those screens printed
+// "confirm_location" to the user - and `t('x') || 'fallback'` never fell back either, because the key it
+// returns is a truthy string. Only a comparison between "keys used" and "keys defined" catches that.
 //
 // The file is parsed statically with the TypeScript compiler API (already a
 // devDependency), so no i18next / expo-localization import is needed and the
 // check runs in plain Node — in CI and locally:
 //
-//   node scripts/check-i18n-parity.mjs            # checks ./i18n/index.ts
-//   node scripts/check-i18n-parity.mjs <file.ts>  # checks another file
+//   node scripts/check-i18n-parity.mjs            # checks ./i18n/index.ts + this app's sources
+//   node scripts/check-i18n-parity.mjs <file.ts>  # checks another file (sources = <file>/../..)
 //
 // Nested objects become dotted keys (i18next default keySeparator "."). Exit
 // codes: 0 = parity, 1 = missing/duplicate keys or an unsupported construct
@@ -116,11 +124,79 @@ for (const a of LANGS) {
     for (const k of missing) console.error(`  ${keys[a].get(k)}  ${k}`);
   }
 }
+// ------------------------------------------------- keys the code actually asks for
+// Sources live next to i18n/index.ts: <app>/i18n/index.ts -> <app>.
+const APP = path.dirname(path.dirname(file));
+const SOURCE_DIRS = ['app', 'components', 'hooks', 'services', 'store', 'stores', 'types', 'utils'];
+const SKIP_DIRS = new Set(['node_modules', '.git', '.expo', 'android', 'ios', 'dist', 'build', 'coverage']);
+
+function sourceFiles(dir, out = []) {
+  if (!fs.existsSync(dir)) return out;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (!SKIP_DIRS.has(entry.name)) sourceFiles(full, out);
+    } else if (/\.tsx?$/.test(entry.name)) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+/** `t('key')` / `i18n.t('key')` - the two forms the apps use. Anything else is reported as dynamic. */
+function isTranslateCall(node) {
+  const callee = node.expression;
+  if (ts.isIdentifier(callee)) return callee.text === 't';
+  return (
+    ts.isPropertyAccessExpression(callee) &&
+    callee.name.text === 't' &&
+    ts.isIdentifier(callee.expression) &&
+    (callee.expression.text === 'i18n' || callee.expression.text === 'i18next')
+  );
+}
+
+const used = new Map(); // key -> ["app/x.tsx:12", ...]
+const dynamic = [];
+
+const scanned = SOURCE_DIRS.flatMap((dir) => sourceFiles(path.join(APP, dir), []));
+for (const sourceFile of scanned) {
+  const sf = ts.createSourceFile(sourceFile, fs.readFileSync(sourceFile, 'utf8'), ts.ScriptTarget.Latest, true);
+  const at = (node) =>
+    `${path.relative(APP, sourceFile)}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1}`;
+  const visit = (node) => {
+    if (ts.isCallExpression(node) && node.arguments.length && isTranslateCall(node)) {
+      const arg = node.arguments[0];
+      if (ts.isStringLiteral(arg) || ts.isNoSubstitutionTemplateLiteral(arg)) {
+        if (!used.has(arg.text)) used.set(arg.text, []);
+        used.get(arg.text).push(at(node));
+      } else {
+        // e.g. t(doc.labelKey): the key is only known at runtime, so it is listed, not checked
+        dynamic.push(at(node));
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+}
+
+// A defaultValue (`t('k', 'English')`) does NOT excuse a missing key: it is a hard-coded string that can
+// never be translated, which is exactly what the project rule forbids.
+const undefinedKeys = [...used.keys()].filter((k) => LANGS.some((l) => !keys[l].has(k)));
+if (undefinedKeys.length) {
+  failed = true;
+  console.error(`\n${undefinedKeys.length} key(s) used with t() but not defined in ${rel}:`);
+  for (const k of undefinedKeys.sort()) {
+    const missingIn = LANGS.filter((l) => !keys[l].has(k)).join('+');
+    console.error(`  missing in ${missingIn}: t('${k}')  <- ${used.get(k).join(', ')}`);
+  }
+}
+
 if (problems.length) {
   console.error('');
   for (const p of problems) console.error(p);
 }
 
 const summary = LANGS.map((l) => `${l}=${keys[l].size}`).join(', ');
-console.log(`i18n keys in ${rel}: ${summary} -> ${failed ? 'FAIL' : 'OK (th/en parity)'}`);
+const usage = `${used.size} static t() key(s) used in ${scanned.length} file(s)${dynamic.length ? `, ${dynamic.length} dynamic (not checked: ${dynamic.join(', ')})` : ''}`;
+console.log(`i18n keys in ${rel}: ${summary}; ${usage} -> ${failed ? 'FAIL' : 'OK (th/en parity, no undefined keys)'}`);
 process.exit(failed ? 1 : 0);

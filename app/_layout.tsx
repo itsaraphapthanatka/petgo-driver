@@ -75,8 +75,8 @@ function RootLayout() {
                 const { logout } = useAuthStore.getState();
                 logout();
                 require('react-native').Alert.alert(
-                    i18n.t('access_denied', "Access Denied"),
-                    i18n.t('driver_only_error', "This application is for drivers only. Please use the customer app or contact support.")
+                    i18n.t('access_denied'),
+                    i18n.t('driver_only_error')
                 );
             }
         } else if (!isAuthenticated && !inAuthGroup) {

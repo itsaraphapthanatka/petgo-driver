@@ -1,14 +1,16 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Order, OrderCreate } from '../types/order';
+import { apiFetch } from './httpClient';
+import { apiErrorFromResponse } from '../utils/apiError';
 
 const API_BASE_URL = Platform.OS === 'android' ? process.env.EXPO_PUBLIC_API_BASE_URL : process.env.EXPO_PUBLIC_API_BASE_URL;
 const TOKEN_KEY = '@pet_transport_token';
 
-console.log('API_BASE_URL', API_BASE_URL);
-console.log('TOKEN_KEY', TOKEN_KEY);
-
-// Helper function to get auth headers
+// Helper function to get auth headers.
+// Every request below goes through apiFetch (services/httpClient.ts), so an expired token (401) clears
+// the session once through the handler store/useAuthStore registers, and the root layout sends the driver
+// back to login instead of leaving them on a screen that failed silently. Never call bare fetch here.
 async function getAuthHeaders(): Promise<HeadersInit | null> {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
     if (!token) {
@@ -30,15 +32,14 @@ export const orderService = {
         const headers = await getAuthHeaders();
         if (!headers) throw new Error('Authentication required');
 
-        const response = await fetch(`${API_BASE_URL}/orders/`, {
+        const response = await apiFetch(`${API_BASE_URL}/orders/`, {
             method: 'POST',
             headers,
             body: JSON.stringify(data),
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to create order: ${response.status} - ${errorText}`);
+            throw await apiErrorFromResponse(response, 'Failed to create order');
         }
 
         return await response.json();
@@ -48,7 +49,7 @@ export const orderService = {
     getOrders: async (status?: string): Promise<Order[]> => {
         const headers = await getAuthHeaders();
         if (!headers) {
-            // Return empty instead of throwing if no token found (likely logout situation)
+            // No token at all = nobody is signed in (first launch, or a request that raced logout)
             return [];
         }
 
@@ -57,16 +58,14 @@ export const orderService = {
             url += `?status=${status}`;
         }
 
-        const response = await fetch(url, { headers });
+        const response = await apiFetch(url, { headers });
 
         if (!response.ok) {
-            if (response.status === 401 || response.status === 403) {
-                // Silently return empty on auth errors to avoid crashes during logout
-                return [];
-            }
-            const errorText = await response.text();
-            console.error('Failed to fetch orders:', response.status, errorText);
-            throw new Error(`Failed to fetch orders: ${response.status} - ${errorText}`);
+            // 401 (expired token) and 403 (driver_not_approved / negative wallet) used to become an empty
+            // list here, so a driver whose session died just saw "no jobs" for ever. Both must reach the
+            // caller: apiFetch already cleared the session on 401, and the screens route a 403 to
+            // (driver)/pending-approval (utils/apiError.ts::isDriverNotApprovedError).
+            throw await apiErrorFromResponse(response, 'Failed to fetch orders');
         }
 
         return await response.json();
@@ -77,10 +76,10 @@ export const orderService = {
         const headers = await getAuthHeaders();
         if (!headers) throw new Error('Authentication required');
 
-        const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, { headers });
+        const response = await apiFetch(`${API_BASE_URL}/orders/${orderId}`, { headers });
 
         if (!response.ok) {
-            throw new Error('Failed to fetch order');
+            throw await apiErrorFromResponse(response, 'Failed to fetch order');
         }
 
         return await response.json();
@@ -91,13 +90,11 @@ export const orderService = {
         const headers = await getAuthHeaders();
         if (!headers) return [];
 
-        const response = await fetch(`${API_BASE_URL}/orders/`, { headers });
+        const response = await apiFetch(`${API_BASE_URL}/orders/`, { headers });
 
         if (!response.ok) {
-            if (response.status === 401 || response.status === 403) return [];
-            const errorText = await response.text();
-            console.error('Failed to fetch pending orders:', response.status, errorText);
-            throw new Error(`Failed to fetch pending orders: ${response.status} - ${errorText}`);
+            // See getOrders: never swallow 401/403 here, the driver has to know why the job list is empty
+            throw await apiErrorFromResponse(response, 'Failed to fetch pending orders');
         }
 
         const orders: Order[] = await response.json();
@@ -111,14 +108,13 @@ export const orderService = {
         if (!headers) throw new Error('Authentication required');
 
         // Use the specific endpoint for accepting orders
-        const response = await fetch(`${API_BASE_URL}/orders/${orderId}/accept`, {
+        const response = await apiFetch(`${API_BASE_URL}/orders/${orderId}/accept`, {
             method: 'POST',
             headers,
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to accept order: ${response.status} - ${errorText}`);
+            throw await apiErrorFromResponse(response, 'Failed to accept order');
         }
 
         return await response.json();
@@ -155,17 +151,14 @@ export const orderService = {
             body = undefined;
         }
 
-        console.log(`Updating status to ${status} via ${method} ${endpoint}`);
-
-        const response = await fetch(endpoint, {
+        const response = await apiFetch(endpoint, {
             method,
             headers,
             body: body ? JSON.stringify(body) : undefined,
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to update order status: ${response.status} - ${errorText}`);
+            throw await apiErrorFromResponse(response, 'Failed to update order status');
         }
 
         return await response.json();
@@ -175,16 +168,14 @@ export const orderService = {
         const headers = await getAuthHeaders();
         if (!headers) throw new Error('Authentication required');
 
-        console.log(`Canceling order ${orderId}`);
-        const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
+        const response = await apiFetch(`${API_BASE_URL}/orders/${orderId}`, {
             method: 'PATCH',
             headers,
             body: JSON.stringify({ status: 'cancelled' }),
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to cancel order: ${response.status} - ${errorText}`);
+            throw await apiErrorFromResponse(response, 'Failed to cancel order');
         }
         return await response.json();
     },
@@ -193,14 +184,13 @@ export const orderService = {
         const headers = await getAuthHeaders();
         if (!headers) throw new Error('Authentication required');
 
-        const response = await fetch(`${API_BASE_URL}/orders/${orderId}/decline`, {
+        const response = await apiFetch(`${API_BASE_URL}/orders/${orderId}/decline`, {
             method: 'POST',
             headers,
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to decline order: ${response.status} - ${errorText}`);
+            throw await apiErrorFromResponse(response, 'Failed to decline order');
         }
 
         return await response.json();
@@ -210,15 +200,14 @@ export const orderService = {
         const headers = await getAuthHeaders();
         if (!headers) throw new Error('Authentication required');
 
-        const response = await fetch(`${API_BASE_URL}/orders/${orderId}/stops/${stopId}/status`, {
+        const response = await apiFetch(`${API_BASE_URL}/orders/${orderId}/stops/${stopId}/status`, {
             method: 'PATCH',
             headers,
             body: JSON.stringify({ status }),
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to update stop status: ${response.status} - ${errorText}`);
+            throw await apiErrorFromResponse(response, 'Failed to update stop status');
         }
 
         return await response.json();
@@ -227,7 +216,7 @@ export const orderService = {
         const headers = await getAuthHeaders();
         if (!headers) throw new Error('Authentication required');
 
-        const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
+        const response = await apiFetch(`${API_BASE_URL}/orders/${orderId}`, {
             method: 'PATCH',
             headers,
             body: JSON.stringify({
@@ -237,24 +226,22 @@ export const orderService = {
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to update customer location: ${response.status} - ${errorText}`);
+            throw await apiErrorFromResponse(response, 'Failed to update customer location');
         }
 
         return await response.json();
     },
     payWithWallet: async (orderId: number): Promise<Order> => {
-        const token = await AsyncStorage.getItem(TOKEN_KEY);
-        const response = await fetch(`${API_BASE_URL}/orders/${orderId}/pay-wallet`, {
+        const headers = await getAuthHeaders();
+        if (!headers) throw new Error('Authentication required');
+
+        const response = await apiFetch(`${API_BASE_URL}/orders/${orderId}/pay-wallet`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
+            headers,
         });
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to pay with wallet');
+            // Screens show errorDetail(error) so the user reads the backend reason, not the context prefix
+            throw await apiErrorFromResponse(response, 'Failed to pay with wallet');
         }
         return response.json();
     },
@@ -269,7 +256,8 @@ export const orderService = {
             const activeOrder = orders.find(o => activeStatuses.includes(o.status));
             return activeOrder || null;
         } catch (error: any) {
-            // Suppress Redbox for auth errors (401/403) to allow user to logout
+            // The session was already cleared by apiFetch on a 401; a 403 is a role/approval problem that the
+            // screens handle themselves. Returning null here only keeps this convenience call from red-boxing.
             if (error.message && (error.message.includes('401') || error.message.includes('403'))) {
                 console.warn('Authentication mismatch in getActiveOrder (ignoring):', error.message);
                 return null;

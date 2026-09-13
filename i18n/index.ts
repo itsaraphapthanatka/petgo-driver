@@ -146,6 +146,18 @@ const resources = {
             add_credit_card: "Add Credit/Debit Card",
             pay_at_destination_cash: "Pay at destination (Cash)",
 
+            // Job screen + shared location picker (app/(driver)/job/[id].tsx, app/_layout.tsx,
+            // components/LocationSearch.tsx). These were called through t() before they existed here, so
+            // the screens printed the raw key names.
+            customer: "Customer",
+            cancel_job: "Cancel job",
+            arrived_at_stop: "Arrived at stop",
+            departed_from_stop: "Departed from stop",
+            access_denied: "Access denied",
+            driver_only_error: "This application is for drivers only. Please use the customer app or contact support.",
+            select_location: "Select location",
+            add_stop: "Add stop",
+
             // Statuses/Jobs
             finding_driver: "Finding your driver...",
             connecting_nearest: "We are connecting you with the nearest {{vehicle}}",
@@ -389,6 +401,18 @@ const resources = {
             credit_card: "บัตรเครดิต/เดบิต",
             add_credit_card: "เพิ่มบัตรเครดิต",
             pay_at_destination_cash: "ชำระเมื่อถึงที่หมาย (เงินสด)",
+
+            // Job screen + shared location picker (app/(driver)/job/[id].tsx, app/_layout.tsx,
+            // components/LocationSearch.tsx). These were called through t() before they existed here, so
+            // the screens printed the raw key names.
+            customer: "ลูกค้า",
+            cancel_job: "ยกเลิกงาน",
+            arrived_at_stop: "ถึงจุดแวะที่",
+            departed_from_stop: "ออกจากจุดแวะที่",
+            access_denied: "ไม่มีสิทธิ์เข้าใช้งาน",
+            driver_only_error: "แอปนี้สำหรับคนขับเท่านั้น กรุณาใช้แอปลูกค้า หรือติดต่อฝ่ายสนับสนุน",
+            select_location: "เลือกตำแหน่ง",
+            add_stop: "เพิ่มจุดแวะ",
 
             // Statuses/Jobs
             finding_driver: "กำลังหาคนขับรถ...",

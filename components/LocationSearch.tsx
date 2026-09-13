@@ -97,7 +97,7 @@ export const LocationSearch: React.FC<LocationSearchProps> = ({
                         className="flex-row items-center ml-10 mb-3"
                     >
                         <Plus size={16} color="#3B82F6" />
-                        <Text className="text-blue-500 text-sm font-medium ml-2">{t('เพิ่มจุดแวะ') || 'Add Stop'}</Text>
+                        <Text className="text-blue-500 text-sm font-medium ml-2">{t('add_stop')}</Text>
                     </TouchableOpacity>
 
                     {/* Dropoff Input */}

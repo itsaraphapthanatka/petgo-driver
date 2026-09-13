@@ -1,5 +1,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiFetch } from './httpClient';
+import { apiErrorFromResponse } from '../utils/apiError';
 
 export interface Pet {
     id: string;
@@ -24,6 +26,8 @@ export interface PetCreate {
     weight: number;
 }
 
+// Every request below goes through apiFetch (services/httpClient.ts) so an expired token (401) clears the
+// session once instead of leaving the pet list empty with a generic error. Never call bare fetch here.
 const API_BASE_URL = Platform.OS === 'android' ? process.env.EXPO_PUBLIC_API_BASE_URL : process.env.EXPO_PUBLIC_API_BASE_URL;
 const TOKEN_KEY = '@pet_transport_token';
 
@@ -43,12 +47,10 @@ async function getAuthHeaders(): Promise<HeadersInit> {
 export const petService = {
     getPets: async (): Promise<Pet[]> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/pets/`, { headers });
+        const response = await apiFetch(`${API_BASE_URL}/pets/`, { headers });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`Fetch pets error: ${response.status} - ${errorText}`);
-            throw new Error(`Failed to fetch pets: ${response.status} - ${errorText}`);
+            throw await apiErrorFromResponse(response, 'Failed to fetch pets');
         }
 
         const data = await response.json();
@@ -61,10 +63,10 @@ export const petService = {
     },
 
     getPetTypes: async (): Promise<PetType[]> => {
-        const response = await fetch(`${API_BASE_URL}/pets/types`);
+        const response = await apiFetch(`${API_BASE_URL}/pets/types`);
 
         if (!response.ok) {
-            throw new Error('Failed to fetch pet types');
+            throw await apiErrorFromResponse(response, 'Failed to fetch pet types');
         }
 
         return await response.json();
@@ -72,15 +74,14 @@ export const petService = {
 
     createPet: async (data: PetCreate): Promise<Pet> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/pets/`, {
+        const response = await apiFetch(`${API_BASE_URL}/pets/`, {
             method: 'POST',
             headers,
             body: JSON.stringify(data),
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to create pet: ${response.status} - ${errorText}`);
+            throw await apiErrorFromResponse(response, 'Failed to create pet');
         }
 
         const pet = await response.json();

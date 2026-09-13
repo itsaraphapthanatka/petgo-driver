@@ -581,16 +581,18 @@ export const api = {
         return response.json();
     },
 
+    // PUT /drivers/bank-account (app/routers/drivers.py, body DriverBankUpdate, response DriverOut). The old
+    // call was PATCH /drivers/bank, a route the backend never had, so every save answered 405 and no driver
+    // could ever enter the account their withdrawals are paid to.
     updateDriverBank: async (bankData: { bank_name: string, bank_account_number: string, bank_account_name: string }): Promise<any> => {
         const headers = await getAuthHeaders();
-        const response = await apiFetch(`${API_BASE_URL}/drivers/bank`, {
-            method: 'PATCH',
+        const response = await apiFetch(`${API_BASE_URL}/drivers/bank-account`, {
+            method: 'PUT',
             headers,
             body: JSON.stringify(bankData)
         });
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to update bank: ${errorText}`);
+            throw await apiErrorFromResponse(response, 'Failed to update bank account');
         }
         return response.json();
     },

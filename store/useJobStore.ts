@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Order } from '../types/order';
 import { orderService } from '../services/orderService';
+import { errorDetail } from '../utils/apiError';
 
 interface JobState {
     pendingJobs: Order[];
@@ -35,7 +36,9 @@ export const useJobStore = create<JobState>((set, get) => ({
             set({ pendingJobs: filteredJobs, isLoading: false });
         } catch (error: any) {
             console.error('Failed to fetch pending jobs:', error);
-            set({ error: error.message, isLoading: false });
+            // errorDetail = the backend reason only (e.g. "driver not approved"), without the "Failed to fetch
+            // pending orders: 403 - " prefix that ApiError keeps for the .includes() checks in the screens.
+            set({ error: errorDetail(error), isLoading: false });
         }
     },
 

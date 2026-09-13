@@ -131,10 +131,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     clearError: () => set({ error: null }),
 }));
 
-// Global rule for expired sessions: any 401 from services/api.ts clears the session once, so the root
-// layout sends the user to login instead of leaving them on a screen that failed silently. The handler
-// is injected (see services/httpClient.ts) because a service importing this store would close the
-// require cycle services -> useAuthStore -> useJobStore -> services/orderService.
+// Global rule for expired sessions: any 401 from a service that uses apiFetch (api.ts, orderService.ts,
+// petService.ts, authService.ts) clears the session once, so the root layout sends the user to login
+// instead of leaving them on a screen that failed silently. The handler is injected (see
+// services/httpClient.ts) because a service importing this store would close the require cycle
+// services -> useAuthStore -> useJobStore -> services/orderService.
 setUnauthorizedHandler(async () => {
     if (!useAuthStore.getState().isAuthenticated) return; // already signed out, or a public endpoint
     await useAuthStore.getState().logout();

@@ -3,7 +3,9 @@
 //
 //   1. services/httpClient.ts   - every 401 clears the session exactly once (apiFetch)
 //   2. utils/apiError.ts        - a 403 driver_not_approved is recognised in both shapes it arrives in
-//   3. static tripwires         - api.ts routes every request through apiFetch and imports no store,
+//   3. services/*.ts (AST)      - no file builds a request to the PetGo backend with bare fetch(, in
+//                                 either app, so the global 401 rule really covers every call
+//   4. static tripwires         - api.ts routes every request through apiFetch and imports no store,
 //                                 useAuthStore registers the handler, chatSocket sends the token and
 //                                 never logs the URL, authService logs no OTP/token, and the shared
 //                                 files are byte-identical in both apps.
@@ -16,6 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.resolve(HERE, '..');
@@ -148,8 +151,11 @@ check('structured 403 detail is recognised', () =>
 check('403 with the code only in the text is recognised', () =>
   isDriverNotApprovedError(new ApiError(403, 'driver_not_approved', 'ctx')) ? null : 'not recognised');
 
-// services/orderService.ts throws `new Error("Failed to accept order: 403 - <raw body>")`
-check('raw-body Error from orderService is recognised', () =>
+// Legacy shape: a service that throws `new Error("Failed to accept order: 403 - <raw body>")` instead of an
+// ApiError. Nothing in services/ does that any more (orderService.ts moved to apiErrorFromResponse together
+// with apiFetch), but the text path stays covered so a hand-written throw somewhere else is still routed to
+// the pending-approval screen instead of a meaningless alert.
+check('raw-body Error from a service is recognised', () =>
   isDriverNotApprovedError(
     new Error(`Failed to accept order: 403 - ${JSON.stringify({ detail: notApproved })}`)
   )
@@ -173,7 +179,97 @@ check('non-errors are safe', () =>
     ? 'non-Error value misread'
     : null);
 
-// -------------------------------------------------------- 3. static tripwires
+// ----------------------- 3. every backend call in services/ goes through apiFetch
+//
+// The api.ts tripwire further down only ever looked at api.ts. That is how services/orderService.ts (11
+// calls) and services/petService.ts (3) kept using bare fetch while this script reported 35/35: an expired
+// token produced a blank screen, and in the driver app getOrders() even turned 401/403 into `return []`, so a
+// driver whose session died saw "no jobs" for ever instead of being sent back to login. The rule now
+// covers the whole folder, in both apps, and is checked on the syntax tree so that a URL held in a
+// variable (`const url = `${API_BASE_URL}/auth/me`; fetch(url)`) counts too.
+//
+// Only httpClient.ts is exempt: it *is* the wrapper. Services that call a third party (Google Directions,
+// Longdo, Google Geocoding) are not exempt - they simply never build a URL from API_BASE_URL, so they do
+// not match. Anything that does talk to our backend must be able to report an expired session.
+// Limitation: the backend base has to be named API_BASE_URL (the convention in every service today);
+// a request built from a differently named constant would not be recognised as a backend call.
+const APIFETCH_EXEMPT = new Map([
+  ['httpClient.ts', 'defines apiFetch; its one bare fetch( is the real network call'],
+]);
+
+/** Lines in `app`'s services/ where bare fetch( is called with a URL built from the backend base. */
+function bareBackendFetches(app) {
+  const dir = path.join(app, 'services');
+  if (!fs.existsSync(dir)) return [];
+  const offenders = [];
+  for (const name of fs.readdirSync(dir).sort()) {
+    if (!/\.tsx?$/.test(name) || APIFETCH_EXEMPT.has(name)) continue;
+    const text = fs.readFileSync(path.join(dir, name), 'utf8');
+    const sf = ts.createSourceFile(name, text, ts.ScriptTarget.Latest, true);
+    const buildsBackendUrl = (node) => /\bAPI_BASE_URL\b/.test(node.getText(sf));
+
+    // Names that hold a URL built from the backend base, so `fetch(url)` is recognised as a backend call
+    const backendUrlNames = new Set();
+    const collectNames = (node) => {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer && buildsBackendUrl(node.initializer)) {
+        backendUrlNames.add(node.name.text);
+      } else if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        ts.isIdentifier(node.left) &&
+        buildsBackendUrl(node.right)
+      ) {
+        backendUrlNames.add(node.left.text);
+      }
+      ts.forEachChild(node, collectNames);
+    };
+    collectNames(sf);
+
+    const lines = [];
+    const visit = (node) => {
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'fetch') {
+        const arg = node.arguments[0];
+        const hitsBackend =
+          !!arg && (buildsBackendUrl(arg) || (ts.isIdentifier(arg) && backendUrlNames.has(arg.text)));
+        if (hitsBackend) lines.push(sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+
+    if (lines.length) offenders.push(`services/${name}:${lines.join(',')}`);
+  }
+  return offenders;
+}
+
+for (const app of [APP, OTHER_APP]) {
+  check(`every backend call in services/ uses apiFetch in ${path.basename(app)}`, () => {
+    if (!fs.existsSync(app)) return null; // reported once below
+    const offenders = bareBackendFetches(app);
+    return offenders.length === 0
+      ? null
+      : `bare fetch( on the PetGo backend (use apiFetch): ${offenders.join(' | ')}`;
+  });
+}
+
+// A file that talks to the backend must also import the wrapper, so the check above cannot be silenced by
+// shadowing `fetch` with a local helper.
+for (const app of [APP, OTHER_APP]) {
+  check(`services that call the backend import apiFetch in ${path.basename(app)}`, () => {
+    const dir = path.join(app, 'services');
+    if (!fs.existsSync(dir)) return null;
+    const missing = [];
+    for (const name of fs.readdirSync(dir).sort()) {
+      if (!/\.tsx?$/.test(name) || APIFETCH_EXEMPT.has(name)) continue;
+      const text = fs.readFileSync(path.join(dir, name), 'utf8');
+      if (!/\bapiFetch\s*\(/.test(text)) continue; // does not call the backend at all
+      if (!/import\s*\{[^}]*\bapiFetch\b[^}]*\}\s*from\s*'\.\/httpClient'/.test(text)) missing.push(name);
+    }
+    return missing.length === 0 ? null : `apiFetch used without importing ./httpClient: ${missing.join(', ')}`;
+  });
+}
+
+// -------------------------------------------------------- 4. static tripwires
 const api = read('services/api.ts');
 check('api.ts routes every request through apiFetch', () => {
   const bare = api.match(/(?<![A-Za-z.])fetch\(/g) ?? [];

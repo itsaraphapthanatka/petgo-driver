@@ -6,6 +6,7 @@ import { api } from '../../../services/api';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { AppButton } from '../../../components/ui/AppButton';
 import { useRouter } from 'expo-router';
+import { errorDetail } from '../../../utils/apiError';
 
 export default function BankSettingsScreen() {
     const { user, setUser } = useAuthStore();
@@ -50,7 +51,7 @@ export default function BankSettingsScreen() {
             Alert.alert('สำเร็จ', 'บันทึกข้อมูลธนาคารเรียบร้อยแล้ว');
             router.back();
         } catch (error: any) {
-            Alert.alert('เกิดข้อผิดพลาด', error.message || 'ไม่สามารถบันทึกข้อมูลได้');
+            Alert.alert('เกิดข้อผิดพลาด', errorDetail(error) || 'ไม่สามารถบันทึกข้อมูลได้');
         } finally {
             setIsSaving(false);
         }
