@@ -10,6 +10,7 @@ import { orderService } from '../../../services/orderService';
 import { googleDirectionsApi, LatLng } from '../../../services/googleDirectionsApi';
 import { RouteErrorBanner } from '../../../components/RouteErrorBanner';
 import { formatPrice } from '../../../utils/format';
+import { isDriverNotApprovedError } from '../../../utils/apiError';
 import { AppButton } from '../../../components/ui/AppButton';
 import { useJobStore } from '../../../store/useJobStore';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -117,7 +118,11 @@ export default function JobPreviewScreen() {
             console.error('Failed to accept job:', error);
             const errorMessage = error.message || '';
 
-            if (errorMessage.includes('403') || errorMessage.includes('ยอดเงินในกระเป๋าติดลบเกิน 500 บาท') || errorMessage.includes('Insufficient wallet balance')) {
+            // Not approved to work: this 403 is not about the wallet, so it must be checked first
+            if (isDriverNotApprovedError(error)) {
+                setIsAccepting(false);
+                router.push('/(driver)/pending-approval');
+            } else if (errorMessage.includes('403') || errorMessage.includes('ยอดเงินในกระเป๋าติดลบเกิน 500 บาท') || errorMessage.includes('Insufficient wallet balance')) {
                 Alert.alert(
                     "ยอดเงินไม่เพียงพอ",
                     "ยอดเงินในกระเป๋าของคุณติดลบเกิน 500 บาท กรุณาเติมเงินเข้าระบบเพื่อรับงานต่อ",

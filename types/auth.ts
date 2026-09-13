@@ -1,3 +1,6 @@
+/** Where a driver stands in the admin verification queue (backend `drivers.registration_status`). */
+export type DriverRegistrationStatus = 'pending' | 'approved' | 'rejected';
+
 export interface User {
     id: number;
     full_name: string;
@@ -10,6 +13,23 @@ export interface User {
     bank_account_number?: string;
     bank_account_name?: string;
     work_radius_km?: number;
+
+    // ---- Drivers only: GET /auth/me returns backend schemas.DriverOut for a driver token ----
+    /** Absent on customers/admins, and on older backends. `undefined` must not lock a driver out. */
+    registration_status?: DriverRegistrationStatus;
+    is_verified?: boolean;
+    /** Reason the admin typed when rejecting the application (shown on the pending-approval screen). */
+    rejection_reason?: string | null;
+    /** Vehicle the driver registered; shown so they can spot a wrong plate before an admin rejects it. */
+    vehicle_type?: string | null;
+    vehicle_plate?: string | null;
+    // Documents the admin verification queue looks at. Only presence is used in the app (there is no
+    // upload UI yet), never the URL itself: /uploads is public, so a URL must not be rendered or logged.
+    id_card_front_url?: string | null;
+    driver_license_front_url?: string | null;
+    selfie_with_id_url?: string | null;
+    vehicle_registration_url?: string | null;
+    bank_account_image_url?: string | null;
 }
 
 export interface LoginRequest {

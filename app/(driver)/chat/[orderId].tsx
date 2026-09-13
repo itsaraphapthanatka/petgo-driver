@@ -2,7 +2,8 @@ import { View, FlatList, Text, KeyboardAvoidingView, Platform, TouchableOpacity,
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { connectChat, sendMessage, sendTyping, disconnectChat } from "../../../services/chatSocket";
+import { useTranslation } from "react-i18next";
+import { connectChat, sendMessage, sendTyping, disconnectChat, ChatSocketFailure } from "../../../services/chatSocket";
 import { api } from "../../../services/api";
 import { useChatStore } from "../../../stores/chatStore";
 import { useAuthStore } from "../../../store/useAuthStore";
@@ -14,10 +15,12 @@ import { ArrowLeft, Phone } from "lucide-react-native";
 export default function DriverChatScreen() {
     const { orderId } = useLocalSearchParams();
     const router = useRouter();
+    const { t } = useTranslation();
     const { messages, addMessage, setTyping, setMessages, clearMessages, typing } = useChatStore();
     const { user } = useAuthStore();
     const { activeJob } = useJobStore();
     const [isLoading, setIsLoading] = useState(true);
+    const [socketFailure, setSocketFailure] = useState<ChatSocketFailure | null>(null);
 
     const userId = user?.id || 0;
     const customerName = activeJob?.customer?.full_name || 'Customer';
@@ -26,10 +29,10 @@ export default function DriverChatScreen() {
         // Clear previous messages when entering
         clearMessages();
         setIsLoading(true);
+        setSocketFailure(null);
 
         // Fetch history
         api.getChatHistory(Number(orderId)).then((data) => {
-            console.log("getChatHistory data", data);
             if (Array.isArray(data)) {
                 const mappedMessages = data.map((msg: any) => ({
                     ...msg,
@@ -44,13 +47,13 @@ export default function DriverChatScreen() {
         // Mark as read
         api.markChatRead(Number(orderId));
 
-        // Connect Socket as driver
+        // Connect Socket as driver. The token authenticates the socket; the server derives the sender
+        // from it. A failure is shown once - connectChat never retries by itself.
         connectChat(
             Number(orderId),
             userId,
             "driver",
             (data) => {
-                console.log("Received chat data:", data);
                 if (data.type === "typing") {
                     setTyping(data.is_typing);
                 } else {
@@ -62,7 +65,8 @@ export default function DriverChatScreen() {
                     };
                     addMessage(normalizedMsg);
                 }
-            }
+            },
+            (reason) => setSocketFailure(reason)
         );
 
         return () => {
@@ -96,6 +100,14 @@ export default function DriverChatScreen() {
                         <Phone size={20} color="white" />
                     </TouchableOpacity>
                 </View>
+
+                {socketFailure && (
+                    <View className="bg-amber-50 border-b border-amber-200 px-5 py-3">
+                        <Text className="text-amber-800 text-xs font-medium">
+                            {socketFailure === 'auth' ? t('chat_socket_auth_failed') : t('chat_socket_disconnected')}
+                        </Text>
+                    </View>
+                )}
 
                 <KeyboardAvoidingView
                     behavior={Platform.OS === "ios" ? "padding" : undefined}

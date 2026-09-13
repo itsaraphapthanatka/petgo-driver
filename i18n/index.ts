@@ -210,7 +210,41 @@ const resources = {
             route_error_config: "Google Maps API key is not configured in this app",
             route_error_quota: "Route lookup quota exceeded. Please try again later.",
             route_error_network: "No internet connection. Could not load the route.",
-            route_error_generic: "Could not load the route ({{detail}})"
+            route_error_generic: "Could not load the route ({{detail}})",
+
+            // Chat: the WebSocket is authenticated with the access token and never retries by itself
+            chat_socket_auth_failed: "Chat could not be opened: your session is no longer valid for this trip. Please sign in again.",
+            chat_socket_disconnected: "Chat is disconnected, so new messages will not appear. Leave this screen and open it again to reconnect.",
+
+            // Waiting for admin approval (app/(driver)/pending-approval.tsx)
+            pending_approval: {
+                title_pending: "Waiting for approval",
+                title_rejected: "Application not approved",
+                title_approved: "Your account is approved",
+                body_pending: "Our team reviews new drivers within 1-2 business days. You will be notified as soon as your account is approved. Until then you cannot go online or accept jobs.",
+                body_rejected: "Your driver application was not approved. Please contact PetGo support to correct your details and apply again.",
+                body_approved: "Your account has been approved. You can go online and start accepting jobs.",
+                rejection_reason_label: "Reason from the review team",
+                documents_title: "Documents for the review",
+                documents_hint: "Uploading from the app is not available yet - please send the missing documents to PetGo support so the team can finish the review.",
+                documents_complete: "All documents have been received. Nothing else is needed from you.",
+                doc_id_card: "ID card (front)",
+                doc_license: "Driving licence (front)",
+                doc_selfie: "Photo of you holding your ID card",
+                doc_vehicle_registration: "Vehicle registration",
+                doc_bank_account: "Bank account book page",
+                doc_received: "Received",
+                doc_missing: "Missing",
+                account_title: "What the review team sees",
+                account_name: "Name",
+                account_phone: "Phone",
+                account_vehicle: "Vehicle",
+                account_missing_value: "Not provided",
+                refresh: "Check status again",
+                refresh_failed: "Could not refresh your status. Please check your connection and try again.",
+                go_home: "Start working",
+                logout: "Log out"
+            }
         }
     },
     th: {
@@ -420,7 +454,41 @@ const resources = {
             route_error_config: "แอปยังไม่ได้ตั้งค่า Google Maps API key",
             route_error_quota: "โควตาการค้นหาเส้นทางเต็มแล้ว กรุณาลองใหม่ภายหลัง",
             route_error_network: "ไม่มีการเชื่อมต่ออินเทอร์เน็ต ไม่สามารถโหลดเส้นทางได้",
-            route_error_generic: "โหลดเส้นทางไม่สำเร็จ ({{detail}})"
+            route_error_generic: "โหลดเส้นทางไม่สำเร็จ ({{detail}})",
+
+            // Chat: the WebSocket is authenticated with the access token and never retries by itself
+            chat_socket_auth_failed: "เปิดแชทไม่ได้ เพราะเซสชันของคุณใช้กับทริปนี้ไม่ได้แล้ว กรุณาเข้าสู่ระบบใหม่",
+            chat_socket_disconnected: "การเชื่อมต่อแชทหลุด ข้อความใหม่จะไม่แสดง กรุณาออกจากหน้านี้แล้วเปิดใหม่เพื่อเชื่อมต่ออีกครั้ง",
+
+            // Waiting for admin approval (app/(driver)/pending-approval.tsx)
+            pending_approval: {
+                title_pending: "รอการตรวจสอบ",
+                title_rejected: "คำขอไม่ผ่านการอนุมัติ",
+                title_approved: "บัญชีได้รับการอนุมัติแล้ว",
+                body_pending: "ทีมงานจะตรวจสอบคนขับใหม่ภายใน 1-2 วันทำการ เมื่อบัญชีได้รับการอนุมัติ คุณจะได้รับการแจ้งเตือน ระหว่างนี้จะยังเปิดออนไลน์และรับงานไม่ได้",
+                body_rejected: "คำขอสมัครคนขับของคุณไม่ผ่านการอนุมัติ กรุณาติดต่อฝ่ายสนับสนุนของ PetGo เพื่อแก้ไขข้อมูลและยื่นคำขอใหม่",
+                body_approved: "บัญชีของคุณได้รับการอนุมัติแล้ว สามารถเปิดออนไลน์และเริ่มรับงานได้เลย",
+                rejection_reason_label: "เหตุผลจากทีมตรวจสอบ",
+                documents_title: "เอกสารสำหรับการตรวจสอบ",
+                documents_hint: "แอปยังไม่รองรับการอัปโหลดเอกสาร กรุณาส่งเอกสารที่ยังขาดให้ฝ่ายสนับสนุนของ PetGo เพื่อให้ทีมงานตรวจสอบต่อได้",
+                documents_complete: "ได้รับเอกสารครบแล้ว ไม่ต้องดำเนินการเพิ่ม",
+                doc_id_card: "บัตรประชาชน (ด้านหน้า)",
+                doc_license: "ใบขับขี่ (ด้านหน้า)",
+                doc_selfie: "รูปถ่ายคู่กับบัตรประชาชน",
+                doc_vehicle_registration: "สำเนาทะเบียนรถ",
+                doc_bank_account: "หน้าสมุดบัญชีธนาคาร",
+                doc_received: "ได้รับแล้ว",
+                doc_missing: "ยังไม่ได้รับ",
+                account_title: "ข้อมูลที่ทีมตรวจสอบเห็น",
+                account_name: "ชื่อ-นามสกุล",
+                account_phone: "เบอร์โทรศัพท์",
+                account_vehicle: "รถที่ใช้รับงาน",
+                account_missing_value: "ยังไม่ได้ระบุ",
+                refresh: "ตรวจสอบสถานะอีกครั้ง",
+                refresh_failed: "ตรวจสอบสถานะไม่สำเร็จ กรุณาเช็คการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่",
+                go_home: "เริ่มรับงาน",
+                logout: "ออกจากระบบ"
+            }
         }
     }
 };

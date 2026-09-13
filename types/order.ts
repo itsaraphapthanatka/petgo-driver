@@ -17,16 +17,19 @@ export interface UserOut {
     email?: string | null;
 }
 
+/**
+ * Nested driver of OrderOut (backend schemas.DriverOut). Contact fields are top level: drivers are
+ * their own table, so there is no nested `user` (and no `user_id`) any more. Reading `driver.user`
+ * always produced the fallback name, which is why the fields were removed here.
+ */
 export interface DriverOut {
     id: number;
-    user_id: number;
-    // Backend DriverOut exposes contact fields at top level (drivers are no longer coupled to users).
     full_name?: string | null;
     phone?: string | null;
+    email?: string | null;
     vehicle_type?: string | null;
     vehicle_plate?: string | null;
     is_online: boolean;
-    user: UserOut;
 }
 
 export interface PetOut {

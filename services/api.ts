@@ -100,8 +100,8 @@ export interface PricingSettings {
 }
 
 import { Platform } from 'react-native';
-import { useAuthStore } from '../store/useAuthStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiFetch } from './httpClient';
 import { apiErrorFromResponse } from '../utils/apiError';
 
 // Without EXPO_PUBLIC_API_BASE_URL (.env locally, eas.json for EAS builds) fall back to a backend on the
@@ -124,7 +124,9 @@ const getBaseUrl = () => {
 const API_BASE_URL = getBaseUrl();
 const TOKEN_KEY = '@pet_transport_token';
 
-// Helper function to get auth headers
+// Helper function to get auth headers.
+// Every call below goes through apiFetch (services/httpClient.ts), so a 401 on any of them clears the
+// session through the handler store/useAuthStore registers - screens no longer have to check for it.
 async function getAuthHeaders(): Promise<HeadersInit> {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
     const headers: HeadersInit = {
@@ -141,7 +143,7 @@ async function getAuthHeaders(): Promise<HeadersInit> {
 export const api = {
     getVehicleTypes: async (): Promise<VehicleType[]> => {
         try {
-            const response = await fetch(`${API_BASE_URL}/pricing/vehicle-types`);
+            const response = await apiFetch(`${API_BASE_URL}/pricing/vehicle-types`);
             if (!response.ok) {
                 throw new Error('Failed to fetch vehicle types');
             }
@@ -160,7 +162,7 @@ export const api = {
 
     updatePricingSettings: async (settings: { map: string }): Promise<PricingSettings> => {
         try {
-            const response = await fetch(`${API_BASE_URL}/pricing/settings`, {
+            const response = await apiFetch(`${API_BASE_URL}/pricing/settings`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -179,7 +181,7 @@ export const api = {
 
     getPaymentConfig: async (): Promise<{ cash: boolean; promptpay: boolean; wallet: boolean; stripe: boolean }> => {
         try {
-            const response = await fetch(`${API_BASE_URL}/payments/config`);
+            const response = await apiFetch(`${API_BASE_URL}/payments/config`);
             if (!response.ok) {
                 throw new Error('Failed to fetch payment config');
             }
@@ -192,7 +194,7 @@ export const api = {
 
     getPricingSettings: async (): Promise<PricingSettings> => {
         try {
-            const response = await fetch(`${API_BASE_URL}/pricing/settings`);
+            const response = await apiFetch(`${API_BASE_URL}/pricing/settings`);
             if (!response.ok) {
                 throw new Error('Failed to fetch pricing settings');
             }
@@ -206,17 +208,12 @@ export const api = {
     estimatePrice: async (req: PricingRequest): Promise<PricingResponse> => {
         try {
             // Authenticated so the backend can lock this endpoint (it calls Google Directions per request).
-            const response = await fetch(`${API_BASE_URL}/pricing/estimate`, {
+            const response = await apiFetch(`${API_BASE_URL}/pricing/estimate`, {
                 method: 'POST',
                 headers: await getAuthHeaders(),
                 body: JSON.stringify(req),
             });
 
-            if (response.status === 401) {
-                // Expired / invalid session: clear it so the app returns to login instead of
-                // silently falling back to a locally computed price.
-                await useAuthStore.getState().logout();
-            }
             if (!response.ok) {
                 // ApiError carries the status and FastAPI's `detail` so the screen can show the real reason
                 throw await apiErrorFromResponse(response, 'API Error');
@@ -232,7 +229,7 @@ export const api = {
     getDriverLocations: async (): Promise<DriverLocation[]> => {
         try {
             // GET /driver_locations/ requires a signed-in user (any role) since the PII hardening.
-            const response = await fetch(`${API_BASE_URL}/driver_locations/`, {
+            const response = await apiFetch(`${API_BASE_URL}/driver_locations/`, {
                 headers: await getAuthHeaders(),
             });
             if (!response.ok) {
@@ -249,7 +246,7 @@ export const api = {
     getDriverLocationById: async (id: number): Promise<DriverLocation | null> => {
         try {
             // Requires a token; customers may only read the driver of their own active order (403 otherwise).
-            const response = await fetch(`${API_BASE_URL}/driver_locations/${id}`, {
+            const response = await apiFetch(`${API_BASE_URL}/driver_locations/${id}`, {
                 headers: await getAuthHeaders(),
             });
             if (!response.ok) {
@@ -268,7 +265,7 @@ export const api = {
             const headers = await getAuthHeaders();
 
             // Using the new optimized PUT /driver_locations/me endpoint
-            const response = await fetch(`${API_BASE_URL}/driver_locations/me`, {
+            const response = await apiFetch(`${API_BASE_URL}/driver_locations/me`, {
                 method: 'PUT',
                 headers,
                 body: JSON.stringify({ lat, lng }),
@@ -296,15 +293,17 @@ export const api = {
                 body.lng = lng;
             }
 
-            const response = await fetch(`${API_BASE_URL}/drivers/status`, {
+            const response = await apiFetch(`${API_BASE_URL}/drivers/status`, {
                 method: 'PATCH',
                 headers,
                 body: JSON.stringify(body),
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Failed to update driver status: ${response.status} - ${errorText}`);
+                // ApiError so the caller can read the structured `detail`: a driver whose registration is
+                // not approved gets 403 {code: "driver_not_approved", registration_status, message}
+                // (see utils/apiError.ts::isDriverNotApprovedError).
+                throw await apiErrorFromResponse(response, 'Failed to update driver status');
             }
         } catch (error) {
             console.error('Error updating driver status:', error);
@@ -315,7 +314,7 @@ export const api = {
     updateDeviceToken: async (token: string): Promise<void> => {
         try {
             const headers = await getAuthHeaders();
-            const response = await fetch(`${API_BASE_URL}/users/device-token`, {
+            const response = await apiFetch(`${API_BASE_URL}/users/device-token`, {
                 method: 'PATCH',
                 headers,
                 body: JSON.stringify({ token }),
@@ -332,10 +331,9 @@ export const api = {
     getChatHistory: async (orderId: number): Promise<any[]> => {
         try {
             const headers = await getAuthHeaders();
-            const response = await fetch(`${API_BASE_URL}/chat/${orderId}`, {
+            const response = await apiFetch(`${API_BASE_URL}/chat/${orderId}`, {
                 headers,
             });
-            console.log("getChatHistory response", response);
             if (!response.ok) {
                 throw new Error('Failed to fetch chat history');
             }
@@ -350,7 +348,7 @@ export const api = {
         try {
             const headers = await getAuthHeaders();
             // The backend derives the reader (customer/driver) from the token; it ignores query params.
-            await fetch(`${API_BASE_URL}/chat/${orderId}/read`, {
+            await apiFetch(`${API_BASE_URL}/chat/${orderId}/read`, {
                 method: 'POST',
                 headers,
             });
@@ -362,7 +360,7 @@ export const api = {
     updateDriverWorkRadius: async (radiusKm: number): Promise<DriverDetails> => {
         try {
             const headers = await getAuthHeaders();
-            const response = await fetch(`${API_BASE_URL}/drivers/settings`, {
+            const response = await apiFetch(`${API_BASE_URL}/drivers/settings`, {
                 method: 'PATCH',
                 headers,
                 body: JSON.stringify({ work_radius_km: radiusKm }),
@@ -383,7 +381,7 @@ export const api = {
     getNotifications: async (): Promise<any[]> => {
         try {
             const headers = await getAuthHeaders();
-            const response = await fetch(`${API_BASE_URL}/notifications/`, {
+            const response = await apiFetch(`${API_BASE_URL}/notifications/`, {
                 headers,
             });
 
@@ -401,7 +399,7 @@ export const api = {
     markNotificationAsRead: async (notificationId: number): Promise<void> => {
         try {
             const headers = await getAuthHeaders();
-            const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}/read`, {
+            const response = await apiFetch(`${API_BASE_URL}/notifications/${notificationId}/read`, {
                 method: 'PUT',
                 headers,
             });
@@ -417,7 +415,7 @@ export const api = {
     getDriverEarnings: async (period: 'daily' | 'weekly' | 'monthly'): Promise<any> => {
         try {
             const headers = await getAuthHeaders();
-            const response = await fetch(`${API_BASE_URL}/drivers/earnings/summary?period=${period}`, {
+            const response = await apiFetch(`${API_BASE_URL}/drivers/earnings/summary?period=${period}`, {
                 headers,
             });
 
@@ -435,7 +433,7 @@ export const api = {
     getDriverStats: async (): Promise<any> => {
         try {
             const headers = await getAuthHeaders();
-            const response = await fetch(`${API_BASE_URL}/drivers/stats`, {
+            const response = await apiFetch(`${API_BASE_URL}/drivers/stats`, {
                 headers,
             });
 
@@ -453,7 +451,7 @@ export const api = {
     // ---------- Payments ----------
     createPayment: async (data: PaymentCreate): Promise<PaymentResponse> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/payments/`, {
+        const response = await apiFetch(`${API_BASE_URL}/payments/`, {
             method: 'POST',
             headers,
             body: JSON.stringify(data)
@@ -464,21 +462,21 @@ export const api = {
 
     getPayment: async (paymentId: number): Promise<PaymentResponse> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/payments/${paymentId}`, { headers });
+        const response = await apiFetch(`${API_BASE_URL}/payments/${paymentId}`, { headers });
         if (!response.ok) throw new Error('Failed to fetch payment');
         return response.json();
     },
 
     getPaymentByOrderId: async (orderId: number): Promise<PaymentResponse> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/payments/order/${orderId}`, { headers });
+        const response = await apiFetch(`${API_BASE_URL}/payments/order/${orderId}`, { headers });
         if (!response.ok) throw new Error('Failed to fetch payment by order ID');
         return response.json();
     },
 
     createPaymentIntent: async (data: PaymentCreate): Promise<any> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/payments/create-payment-intent`, {
+        const response = await apiFetch(`${API_BASE_URL}/payments/create-payment-intent`, {
             method: 'POST',
             headers,
             body: JSON.stringify(data)
@@ -493,21 +491,21 @@ export const api = {
     // ---------- Wallet ----------
     getWalletBalance: async (): Promise<any> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/wallet/balance`, { headers });
+        const response = await apiFetch(`${API_BASE_URL}/wallet/balance`, { headers });
         if (!response.ok) throw new Error('Failed to fetch wallet balance');
         return response.json();
     },
 
     getWalletTransactions: async (): Promise<any[]> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/wallet/transactions`, { headers });
+        const response = await apiFetch(`${API_BASE_URL}/wallet/transactions`, { headers });
         if (!response.ok) throw new Error('Failed to fetch transactions');
         return response.json();
     },
 
     topupWallet: async (amount: number, method: string = 'promptpay'): Promise<any> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/wallet/topup`, {
+        const response = await apiFetch(`${API_BASE_URL}/wallet/topup`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ amount, method })
@@ -518,7 +516,7 @@ export const api = {
 
     verifyTopup: async (transactionId: number): Promise<any> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/wallet/verify-topup/${transactionId}`, {
+        const response = await apiFetch(`${API_BASE_URL}/wallet/verify-topup/${transactionId}`, {
             method: 'POST',
             headers
         });
@@ -528,7 +526,7 @@ export const api = {
 
     createSetupIntent: async (): Promise<any> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/payments/setup-intent`, {
+        const response = await apiFetch(`${API_BASE_URL}/payments/setup-intent`, {
             method: 'POST',
             headers
         });
@@ -538,7 +536,7 @@ export const api = {
 
     getPaymentMethods: async (): Promise<any[]> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/payments/payment-methods`, { headers });
+        const response = await apiFetch(`${API_BASE_URL}/payments/payment-methods`, { headers });
         if (!response.ok) {
             const errorText = await response.text();
             console.error('Failed to fetch payment methods:', errorText);
@@ -549,7 +547,7 @@ export const api = {
 
     detachPaymentMethod: async (pmId: string): Promise<any> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/payments/payment-methods/${pmId}`, {
+        const response = await apiFetch(`${API_BASE_URL}/payments/payment-methods/${pmId}`, {
             method: 'DELETE',
             headers
         });
@@ -558,7 +556,7 @@ export const api = {
     },
     chargeSavedCard: async (orderId: number, paymentMethodId: string): Promise<any> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/payments/charge-card?order_id=${orderId}&payment_method_id=${paymentMethodId}`, {
+        const response = await apiFetch(`${API_BASE_URL}/payments/charge-card?order_id=${orderId}&payment_method_id=${paymentMethodId}`, {
             method: 'POST',
             headers
         });
@@ -571,7 +569,7 @@ export const api = {
 
     syncPayment: async (orderId: number): Promise<any> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/payments/sync/${orderId}`, {
+        const response = await apiFetch(`${API_BASE_URL}/payments/sync/${orderId}`, {
             method: 'POST',
             headers
         });
@@ -585,7 +583,7 @@ export const api = {
 
     updateDriverBank: async (bankData: { bank_name: string, bank_account_number: string, bank_account_name: string }): Promise<any> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/drivers/bank`, {
+        const response = await apiFetch(`${API_BASE_URL}/drivers/bank`, {
             method: 'PATCH',
             headers,
             body: JSON.stringify(bankData)
@@ -599,7 +597,7 @@ export const api = {
 
     requestWithdrawal: async (amount: number): Promise<any> => {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/wallet/withdraw`, {
+        const response = await apiFetch(`${API_BASE_URL}/wallet/withdraw`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ amount })

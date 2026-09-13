@@ -12,6 +12,7 @@ import * as Location from 'expo-location';
 import { api } from '../../../services/api';
 import { orderService } from '../../../services/orderService';
 import { formatPrice } from '../../../utils/format';
+import { isDriverNotApprovedError } from '../../../utils/apiError';
 
 export default function DriverHomeScreen() {
     const { t } = useTranslation();
@@ -102,7 +103,13 @@ export default function DriverHomeScreen() {
             setIsOnline(value);
         } catch (error) {
             console.error("Failed to update driver status:", error);
-            Alert.alert("Status Error", "Failed to update online status. Please check your connection.");
+            if (isDriverNotApprovedError(error)) {
+                // The account is not approved (yet): the pending-approval screen explains the real
+                // status and what is missing, which an alert cannot.
+                router.push('/(driver)/pending-approval');
+            } else {
+                Alert.alert("Status Error", "Failed to update online status. Please check your connection.");
+            }
         } finally {
             setIsUpdatingStatus(false);
         }
@@ -191,8 +198,10 @@ export default function DriverHomeScreen() {
             console.error('Failed to accept job:', error);
             const errorMessage = error.message || '';
 
-            // Check for 403 or specific error message from backend
-            if (errorMessage.includes('403') || errorMessage.includes('ยอดเงินในกระเป๋าติดลบเกิน 500 บาท') || errorMessage.includes('Insufficient wallet balance')) {
+            // Not approved to work: this 403 is not about the wallet, so it must be checked first
+            if (isDriverNotApprovedError(error)) {
+                router.push('/(driver)/pending-approval');
+            } else if (errorMessage.includes('403') || errorMessage.includes('ยอดเงินในกระเป๋าติดลบเกิน 500 บาท') || errorMessage.includes('Insufficient wallet balance')) {
                 Alert.alert(
                     "ยอดเงินไม่เพียงพอ",
                     "ยอดเงินในกระเป๋าของคุณติดลบเกิน 500 บาท กรุณาเติมเงินเข้าระบบเพื่อรับงานต่อ",

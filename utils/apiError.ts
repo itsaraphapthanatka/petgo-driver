@@ -93,6 +93,34 @@ export async function apiErrorFromResponse(response: Response, context: string):
     return new ApiError(response.status, detail || `HTTP ${response.status}`, context, detailObject);
 }
 
+/**
+ * `code` of the 403 the backend answers when a driver's registration is not approved yet
+ * (PRD-driver-onboarding US-4): `{"detail": {"code": "driver_not_approved",
+ * "registration_status": "pending", "message": "..."}}` from PATCH /drivers/status,
+ * GET /orders/ and POST /orders/{id}/accept.
+ */
+export const DRIVER_NOT_APPROVED_CODE = 'driver_not_approved';
+
+/**
+ * True when a rejected request means "this driver is not approved to work yet", so the driver app can
+ * show app/(driver)/pending-approval instead of an alert that explains nothing.
+ *
+ * Two shapes are recognised on purpose: services that build an `ApiError` expose the parsed `detail`
+ * object, while the older services in `orderService.ts` throw `new Error("... 403 - <raw body>")`, so
+ * the code is only available as text there.
+ */
+export function isDriverNotApprovedError(error: unknown): boolean {
+    if (isApiError(error)) {
+        if (error.status !== 403) return false;
+        if (error.detailObject?.code === DRIVER_NOT_APPROVED_CODE) return true;
+        return error.detail.includes(DRIVER_NOT_APPROVED_CODE);
+    }
+    if (error instanceof Error) {
+        return error.message.includes('403') && error.message.includes(DRIVER_NOT_APPROVED_CODE);
+    }
+    return false;
+}
+
 /** Human-readable reason for any thrown value: ApiError detail, Error message, or String(). */
 export function errorDetail(error: unknown): string {
     if (isApiError(error)) return error.detail;

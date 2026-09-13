@@ -128,7 +128,6 @@ export const authService = {
     async requestOTP(phoneNumber: string): Promise<OTPResponse> {
         try {
             const url = `${API_BASE_URL}/auth/request-otp`;
-            console.log(`[authService] Requesting OTP from: ${url} with phone: ${phoneNumber}`);
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -157,9 +156,6 @@ export const authService = {
             const url = `${API_BASE_URL}/auth/verify-otp`;
             const body = { phone_number: phoneNumber, otp, role: 'driver' };
 
-            console.log(`[authService] Verifying OTP at: ${url}`);
-            console.log(`[authService] Request body:`, body);
-
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -168,33 +164,27 @@ export const authService = {
                 body: JSON.stringify(body),
             });
 
-            console.log(`[authService] Response status: ${response.status}`);
-            console.log(`[authService] Response headers:`, response.headers);
-
             if (!response.ok) {
                 let errorMessage = 'OTP verification failed';
                 try {
                     const error = await response.json();
-                    console.log(`[authService] Error response (JSON):`, error);
                     errorMessage = error.detail || errorMessage;
                 } catch {
                     // If response is not JSON, try to get text
                     const text = await response.text();
-                    console.log(`[authService] Error response (text):`, text);
                     errorMessage = text || errorMessage;
                 }
                 throw new Error(errorMessage);
             }
 
             const responseText = await response.text();
-            console.log(`[authService] Success response (raw):`, responseText);
 
             let data: AuthResponse;
             try {
                 data = JSON.parse(responseText);
             } catch (parseError) {
+                // Never log responseText: on success it is the TokenResponse, i.e. the access token
                 console.error(`[authService] Failed to parse response:`, parseError);
-                console.error(`[authService] Raw response was:`, responseText.substring(0, 200));
                 throw new Error('Server returned invalid response');
             }
 
@@ -220,7 +210,6 @@ export const authService = {
             }
 
             const url = `${API_BASE_URL}/auth/me`;
-            console.log(`[authService] Fetching current user from: ${url}`);
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {

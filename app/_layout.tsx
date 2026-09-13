@@ -20,7 +20,7 @@ try {
 
 // Initial Route Logic
 function RootLayout() {
-    const { isAuthenticated, role } = useAuthStore();
+    const { isAuthenticated, role, user } = useAuthStore();
     const segments = useSegments();
     const router = useRouter();
     const navigationState = useRootNavigationState();
@@ -50,17 +50,26 @@ function RootLayout() {
         loadUser();
     }, []);
 
+    // A driver may only work once an admin approved the account (PRD-driver-onboarding US-3/US-4);
+    // `undefined` means the backend did not send the field, and must not lock anyone out - the
+    // backend answers 403 driver_not_approved on the endpoints that matter anyway.
+    const registrationStatus = user?.registration_status;
+    const awaitingApproval =
+        role === 'driver' && registrationStatus !== undefined && registrationStatus !== 'approved';
+
     useEffect(() => {
         if (!navigationState?.key) return;
 
         const inAuthGroup = segments[0] === '(auth)';
+        // useSegments() is typed as a one-element tuple until expo-router typed routes are generated
+        const onApprovalScreen = (segments as string[]).join('/') === '(driver)/pending-approval';
 
         if (isAuthenticated && inAuthGroup) {
             const { registerForPushNotificationsAsync } = require('../services/notificationService');
             registerForPushNotificationsAsync();
 
             if (role === 'driver') {
-                router.replace('/(driver)/(tabs)/home');
+                router.replace(awaitingApproval ? '/(driver)/pending-approval' : '/(driver)/(tabs)/home');
             } else {
                 // Not a driver, show error and logout
                 const { logout } = useAuthStore.getState();
@@ -75,8 +84,14 @@ function RootLayout() {
             setTimeout(() => {
                 router.replace('/(auth)/onboarding');
             }, 0);
+        } else if (isAuthenticated && awaitingApproval && !onApprovalScreen) {
+            // Approval was revoked / rejected while the app was open, or GET /auth/me came back pending
+            router.replace('/(driver)/pending-approval');
+        } else if (isAuthenticated && !awaitingApproval && onApprovalScreen) {
+            // The admin approved while the driver waited on that screen
+            router.replace('/(driver)/(tabs)/home');
         }
-    }, [isAuthenticated, role, segments, navigationState?.key]);
+    }, [isAuthenticated, role, awaitingApproval, segments, navigationState?.key]);
 
     return (
         <I18nextProvider i18n={i18n}>
